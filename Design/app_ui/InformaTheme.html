@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InformaTheme — Lockscreen Theme Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Sirin+Stencil&display=swap" rel="stylesheet">
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg0: #0d0f12;
+  --bg1: #13161c;
+  --bg2: #1a1e27;
+  --bg3: #222736;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #e8ecf2;
+  --text2: #8892a4;
+  --text3: #5a6478;
+  --accent: oklch(0.72 0.18 145);
+  --accent-dim: oklch(0.52 0.14 145);
+  --accent-glow: oklch(0.72 0.18 145 / 0.2);
+  --red: oklch(0.65 0.18 25);
+  --amber: oklch(0.75 0.16 75);
+  --blue: oklch(0.68 0.16 245);
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: 'Space Grotesk', sans-serif;
+  background: var(--bg0);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── TOP NAV ── */
+.topnav {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 20px; height: 52px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.logo {
+  font-size: 17px; font-weight: 700; letter-spacing: -0.5px; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+}
+.logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.nav-tabs { display: flex; gap: 2px; margin-left: 24px; }
+.nav-tab {
+  padding: 5px 14px; border-radius: 7px; font-size: 12px; font-weight: 500;
+  color: var(--text2); cursor: pointer; border: none; background: none;
+  transition: all 0.15s;
+}
+.nav-tab:hover { color: var(--text); background: var(--bg3); }
+.nav-tab.active { color: var(--text); background: var(--bg3); }
+.nav-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.btn-primary {
+  padding: 6px 16px; background: var(--accent); color: #000; border: none;
+  border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif;
+  transition: opacity 0.15s;
+}
+.btn-primary:hover { opacity: 0.85; }
+.btn-ghost {
+  padding: 6px 14px; background: var(--bg3); color: var(--text2); border: 1px solid var(--border2);
+  border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif; transition: all 0.15s;
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+
+/* ── LAYOUT ── */
+.app-body {
+  flex: 1; display: flex; overflow: hidden;
+}
+
+/* ── LEFT SIDEBAR ── */
+.sidebar {
+  width: 260px; flex-shrink: 0;
+  background: var(--bg1);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-tabs {
+  display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.sidebar-tab {
+  flex: 1; padding: 10px 0; font-size: 11px; font-weight: 600; text-align: center;
+  color: var(--text3); cursor: pointer; border: none; background: none;
+  letter-spacing: 0.5px; text-transform: uppercase;
+  transition: all 0.15s;
+}
+.sidebar-tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+.sidebar-tab:hover { color: var(--text2); }
+.sidebar-scroll { flex: 1; overflow-y: auto; padding: 14px 12px; }
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 4px; }
+
+/* ── SECTION ── */
+.section { margin-bottom: 20px; }
+.section-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+  text-transform: uppercase; color: var(--text3); margin-bottom: 8px;
+}
+
+/* ── PRESET GRID ── */
+.preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.preset-card {
+  border-radius: 10px; overflow: hidden; cursor: pointer;
+  border: 2px solid transparent; transition: all 0.15s;
+  aspect-ratio: 9/16;
+  position: relative;
+}
+.preset-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+.preset-card.active { border-color: var(--accent); }
+.preset-card-bg { width: 100%; height: 100%; }
+.preset-name {
+  position: absolute; bottom: 0; left: 0; right: 0; padding: 6px 6px 5px;
+  font-size: 8px; font-weight: 600; color: white;
+  background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* ── FORM CONTROLS ── */
+.form-row { margin-bottom: 10px; }
+.form-label { font-size: 10px; color: var(--text2); margin-bottom: 4px; font-weight: 500; }
+.form-input {
+  width: 100%; padding: 7px 10px; background: var(--bg2);
+  border: 1px solid var(--border2); border-radius: 8px;
+  color: var(--text); font-size: 12px; font-family: 'Space Grotesk', sans-serif;
+  outline: none; transition: border-color 0.15s;
+}
+.form-input:focus { border-color: var(--accent-dim); }
+.form-range {
+  width: 100%; accent-color: var(--accent); cursor: pointer;
+  height: 4px;
+}
+.range-row { display: flex; align-items: center; gap: 8px; }
+.range-val { font-size: 11px; color: var(--text2); min-width: 28px; text-align: right; }
+
+.seg-control { display: flex; gap: 3px; }
+.seg-btn {
+  flex: 1; padding: 5px 0; border-radius: 6px; font-size: 10px; font-weight: 600;
+  border: 1px solid var(--border2); background: var(--bg2); color: var(--text2);
+  cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: all 0.15s;
+  text-align: center;
+}
+.seg-btn:hover { color: var(--text); }
+.seg-btn.active { background: var(--accent); color: #000; border-color: transparent; }
+
+.toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.toggle-label { font-size: 11px; color: var(--text); }
+.toggle {
+  width: 32px; height: 18px; border-radius: 99px; cursor: pointer;
+  position: relative; transition: background 0.2s; flex-shrink: 0;
+}
+.toggle.on { background: var(--accent); }
+.toggle.off { background: var(--bg3); }
+.toggle-knob {
+  position: absolute; top: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: white; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+.toggle.on .toggle-knob { left: 16px; }
+.toggle.off .toggle-knob { left: 2px; }
+
+.color-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.color-swatch {
+  width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: all 0.15s; flex-shrink: 0;
+}
+.color-swatch:hover { transform: scale(1.15); }
+.color-swatch.active { border-color: white; box-shadow: 0 0 0 2px var(--accent); }
+.color-custom { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.color-custom input[type=color] {
+  width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border2);
+  background: none; cursor: pointer; padding: 1px;
+}
+
+/* ── CENTER CANVAS ── */
+.canvas {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: var(--bg0);
+  background-image: radial-gradient(circle at 50% 50%, rgba(74,222,128,0.03) 0%, transparent 60%);
+  position: relative; overflow: hidden;
+}
+.canvas-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.5;
+}
+.phone-wrapper {
+  position: relative; z-index: 1;
+  filter: drop-shadow(0 24px 60px rgba(0,0,0,0.7));
+}
+
+/* ── RIGHT PANEL ── */
+.right-panel {
+  width: 280px; flex-shrink: 0;
+  background: var(--bg1);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.panel-header {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.panel-title { font-size: 13px; font-weight: 700; }
+.panel-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.panel-scroll { flex: 1; overflow-y: auto; padding: 14px; }
+.panel-scroll::-webkit-scrollbar { width: 4px; }
+.panel-scroll::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 4px; }
+
+/* ── WIDGET CARDS ── */
+.widget-card {
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px;
+  padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+  transition: all 0.15s; position: relative;
+}
+.widget-card:hover { border-color: rgba(255,255,255,0.2); }
+.widget-card.active { border-color: var(--accent); background: var(--bg3); }
+.widget-card-header { display: flex; align-items: center; gap: 8px; }
+.widget-icon {
+  width: 30px; height: 30px; border-radius: 8px; display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+  font-size: 14px;
+}
+.widget-info { flex: 1; }
+.widget-name { font-size: 12px; font-weight: 600; }
+.widget-desc { font-size: 10px; color: var(--text3); margin-top: 1px; }
+.widget-check {
+  width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border2);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.widget-check.on { background: var(--accent); border-color: var(--accent); }
+.widget-check-mark { font-size: 9px; color: #000; font-weight: 700; }
+
+/* ── THEME EXPORT CARD ── */
+.export-card {
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px;
+  padding: 14px; margin-bottom: 10px;
+}
+.export-card-title { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+.export-card-desc { font-size: 10px; color: var(--text3); line-height: 1.5; margin-bottom: 10px; }
+.export-code {
+  background: var(--bg0); border: 1px solid var(--border2); border-radius: 8px;
+  padding: 8px 10px; font-family: 'Space Mono', monospace; font-size: 9px;
+  color: var(--text2); line-height: 1.6; white-space: pre-wrap; word-break: break-all;
+}
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #000; padding: 8px 20px; border-radius: 99px;
+  font-size: 12px; font-weight: 700; z-index: 9999;
+  animation: toastIn 0.3s ease;
+  pointer-events: none;
+}
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="android-frame.jsx"></script>
+<script type="text/babel" src="lockscreen-preview.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+// ── PRESETS ──────────────────────────────────────────────
+const PRESETS = [
+  {
+    id: 'forest_dark',
+    name: 'Dark Forest',
+    bgKey: 'forest_dark',
+    accentColor: '#4ade80',
+    clockFont: 'stencil',
+    textColor: 'white',
+    overlayOpacity: 0.18,
+    tagline: 'BEST YEARS AHEAD',
+  },
+  {
+    id: 'forest_mist',
+    name: 'Misty Forest',
+    bgKey: 'forest_mist',
+    accentColor: '#6aab50',
+    clockFont: 'stencil',
+    textColor: '#1a2a1a',
+    overlayOpacity: 0.08,
+    tagline: 'ALL BEST 2025',
+  },
+  {
+    id: 'night_sky',
+    name: 'Night Sky',
+    bgKey: 'night_sky',
+    accentColor: '#60a5fa',
+    clockFont: 'mono',
+    textColor: 'white',
+    overlayOpacity: 0.15,
+    tagline: 'REACH THE STARS',
+  },
+  {
+    id: 'golden_hour',
+    name: 'Golden Hour',
+    bgKey: 'golden_hour',
+    accentColor: '#fbbf24',
+    clockFont: 'bold',
+    textColor: 'white',
+    overlayOpacity: 0.2,
+    tagline: 'SEIZE THE DAY',
+  },
+  {
+    id: 'ocean_deep',
+    name: 'Ocean Deep',
+    bgKey: 'ocean_deep',
+    accentColor: '#22d3ee',
+    clockFont: 'mono',
+    textColor: 'white',
+    overlayOpacity: 0.12,
+    tagline: 'DIVE DEEPER',
+  },
+  {
+    id: 'arctic',
+    name: 'Arctic',
+    bgKey: 'arctic',
+    accentColor: '#6366f1',
+    clockFont: 'bold',
+    textColor: '#1a1a2a',
+    overlayOpacity: 0.06,
+    tagline: 'PURE FOCUS',
+  },
+];
+
+const ACCENT_PALETTE = [
+  '#4ade80', '#22d3ee', '#60a5fa', '#a78bfa',
+  '#f472b6', '#fbbf24', '#fb923c', '#f87171',
+];
+
+// ── TOGGLE ──────────────────────────────────────────────
+function Toggle({ on, onChange }) {
+  return (
+    <div className={`toggle ${on ? 'on' : 'off'}`} onClick={() => onChange(!on)}>
+      <div className="toggle-knob"></div>
+    </div>
+  );
+}
+
+// ── PRESET CARD BG SVGs ──────────────────────────────────
+function PresetThumb({ preset }) {
+  const colors = {
+    forest_dark: ['#1a2a1a','#0d1a0d','#4ade80'],
+    forest_mist: ['#d8e8d0','#8faa8f','#6aab50'],
+    night_sky: ['#0a0a1a','#0d0d2b','#60a5fa'],
+    golden_hour: ['#3d2010','#200808','#fbbf24'],
+    ocean_deep: ['#082040','#020810','#22d3ee'],
+    arctic: ['#e8f0f8','#8090a0','#6366f1'],
+  };
+  const [bg1, bg2, acc] = colors[preset.bgKey] || colors.forest_dark;
+  return (
+    <svg viewBox="0 0 90 160" className="preset-card-bg" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id={`bg-${preset.id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={bg1}/>
+          <stop offset="100%" stopColor={bg2}/>
+        </linearGradient>
+      </defs>
+      <rect width="90" height="160" fill={`url(#bg-${preset.id})`}/>
+      {/* Mini clock */}
+      <text x="45" y="72" textAnchor="middle" fontFamily="monospace" fontSize="22" fontWeight="900" fill="white" opacity="0.9">08:08</text>
+      {/* Status bar */}
+      <rect x="25" y="8" width="40" height="10" rx="5" fill="rgba(255,255,255,0.15)"/>
+      {/* Accent bar */}
+      <rect x="12" y="85" width="30" height="3" rx="2" fill={acc} opacity="0.9"/>
+      {/* Battery */}
+      <rect x="15" y="130" width="55" height="16" rx="5" fill={acc} opacity="0.85"/>
+      <text x="43" y="141" textAnchor="middle" fontSize="8" fill="rgba(0,0,0,0.7)">⚡</text>
+      {/* Pill */}
+      <rect x="10" y="108" width="38" height="9" rx="4.5" fill="rgba(255,255,255,0.15)"/>
+    </svg>
+  );
+}
+
+// ── WIDGET LIST ──────────────────────────────────────────
+const WIDGETS = [
+  { id: 'showMilestones', name: 'Milestone Tracker', desc: 'Live age, days since birth', icon: '🌱', color: '#16a34a' },
+  { id: 'showAnniversary', name: 'Anniversary Ring', desc: 'Progress ring for events', icon: '💍', color: '#7c3aed' },
+  { id: 'showGrowthRing', name: 'Growth Ring', desc: 'Circular progress indicator', icon: '🎯', color: '#0284c7' },
+  { id: 'showBattery', name: 'Battery Bar', desc: 'Animated charging indicator', icon: '⚡', color: '#ca8a04' },
+  { id: 'showWeather', name: 'Weather', desc: 'Temperature + location', icon: '🌤', color: '#0e7490' },
+  { id: 'showMotivation', name: 'Daily Goal', desc: 'Your motivational message', icon: '✦', color: '#be185d' },
+];
+
+// ── EXPORT CODE GENERATOR ────────────────────────────────
+function generateThemeCode(theme) {
+  return `// InformaTheme Config
+const theme = {
+  background: "${theme.bgKey}",
+  accentColor: "${theme.accentColor}",
+  clockFont: "${theme.clockFont}",
+  textColor: "${theme.textColor}",
+  tagline: "${theme.tagline}",
+  personName: "${theme.personName}",
+  batteryPct: ${theme.batteryPct},
+  widgets: {
+    milestones: ${theme.showMilestones},
+    anniversary: ${theme.showAnniversary},
+    growth: ${theme.showGrowthRing},
+    battery: ${theme.showBattery},
+    weather: ${theme.showWeather},
+    motivation: ${theme.showMotivation},
+  }
+};`;
+}
+
+// ── PHONE CANVAS (auto-scales device to fit) ────────────────
+function PhoneCanvas({ theme }) {
+  const canvasRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  const PHONE_W = 360;
+  const PHONE_H = 820;
+
+  useEffect(() => {
+    const update = () => {
+      if (!canvasRef.current) return;
+      const { width, height } = canvasRef.current.getBoundingClientRect();
+      const scaleW = (width - 48) / PHONE_W;
+      const scaleH = (height - 48) / PHONE_H;
+      setScale(Math.min(scaleW, scaleH, 1));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    if (canvasRef.current) ro.observe(canvasRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div className="canvas" ref={canvasRef}>
+      <div className="canvas-grid"></div>
+      <div className="phone-wrapper" style={{
+        transform: `scale(${scale})`,
+        transformOrigin: 'center center',
+        transition: 'transform 0.2s ease',
+      }}>
+        <AndroidDevice width={PHONE_W} height={PHONE_H} dark={true}>          <LockscreenPreview theme={theme} />
+        </AndroidDevice>
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN APP ─────────────────────────────────────────────
+function App() {
+  const [activeTab, setActiveTab] = useState('design'); // design | widgets | export
+  const [sidebarTab, setSidebarTab] = useState('presets'); // presets | style
+  const [activePreset, setActivePreset] = useState('forest_dark');
+  const [toast, setToast] = useState(null);
+  const [selectedWidget, setSelectedWidget] = useState(null);
+
+  const [theme, setTheme] = useState({
+    bgKey: 'forest_dark',
+    accentColor: '#4ade80',
+    clockFont: 'stencil',
+    textColor: 'white',
+    overlayOpacity: 0.18,
+    showBattery: true,
+    showWeather: true,
+    showMilestones: true,
+    showGrowthRing: true,
+    showAnniversary: true,
+    showMotivation: true,
+    customMotivation: 'Make memories.',
+    personName: 'Luka',
+    batteryPct: 78,
+    weatherTemp: '22°C',
+    weatherCity: 'Bhaluka',
+    tagline: 'BEST YEARS AHEAD',
+  });
+
+  const set = useCallback((key, val) => setTheme(t => ({ ...t, [key]: val })), []);
+
+  const applyPreset = (preset) => {
+    setActivePreset(preset.id);
+    setTheme(t => ({ ...t, ...preset }));
+  };
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  };
+
+  // ── SIDEBAR CONTENT ──
+  const renderSidebar = () => {
+    if (sidebarTab === 'presets') {
+      return (
+        <div className="sidebar-scroll">
+          <div className="section">
+            <div className="section-label">Theme Presets</div>
+            <div className="preset-grid">
+              {PRESETS.map(p => (
+                <div
+                  key={p.id}
+                  className={`preset-card ${activePreset === p.id ? 'active' : ''}`}
+                  onClick={() => applyPreset(p)}
+                >
+                  <PresetThumb preset={p} />
+                  <div className="preset-name">{p.name}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // STYLE TAB
+    return (
+      <div className="sidebar-scroll">
+        <div className="section">
+          <div className="section-label">Accent Color</div>
+          <div className="color-row">
+            {ACCENT_PALETTE.map(c => (
+              <div
+                key={c}
+                className={`color-swatch ${theme.accentColor === c ? 'active' : ''}`}
+                style={{ background: c }}
+                onClick={() => set('accentColor', c)}
+              />
+            ))}
+          </div>
+          <div className="color-custom">
+            <input
+              type="color"
+              value={theme.accentColor}
+              onChange={e => set('accentColor', e.target.value)}
+            />
+            <span style={{ fontSize: 11, color: 'var(--text2)' }}>{theme.accentColor}</span>
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="section-label">Clock Style</div>
+          <div className="seg-control">
+            {[['stencil','Stencil'],['mono','Mono'],['bold','Bold']].map(([v,l]) => (
+              <button key={v} className={`seg-btn ${theme.clockFont === v ? 'active' : ''}`}
+                onClick={() => set('clockFont', v)}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="section-label">Text Color</div>
+          <div className="seg-control">
+            {[['white','Light'],['#1a1a1a','Dark']].map(([v,l]) => (
+              <button key={v} className={`seg-btn ${theme.textColor === v ? 'active' : ''}`}
+                onClick={() => set('textColor', v)}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="section-label">Overlay Opacity</div>
+          <div className="range-row">
+            <input type="range" className="form-range" min="0" max="0.6" step="0.02"
+              value={theme.overlayOpacity}
+              onChange={e => set('overlayOpacity', parseFloat(e.target.value))} />
+            <span className="range-val">{Math.round(theme.overlayOpacity * 100)}%</span>
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="section-label">Tagline</div>
+          <input className="form-input" value={theme.tagline}
+            onChange={e => set('tagline', e.target.value)} placeholder="BEST YEARS AHEAD" />
+        </div>
+
+        <div className="section">
+          <div className="section-label">Personal Details</div>
+          <div className="form-row">
+            <div className="form-label">Person's Name</div>
+            <input className="form-input" value={theme.personName}
+              onChange={e => set('personName', e.target.value)} placeholder="Luka" />
+          </div>
+          <div className="form-row">
+            <div className="form-label">Motivation Text</div>
+            <input className="form-input" value={theme.customMotivation}
+              onChange={e => set('customMotivation', e.target.value)} placeholder="Make memories." />
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="section-label">Weather</div>
+          <div className="form-row">
+            <div className="form-label">Temperature</div>
+            <input className="form-input" value={theme.weatherTemp}
+              onChange={e => set('weatherTemp', e.target.value)} placeholder="22°C" />
+          </div>
+          <div className="form-row">
+            <div className="form-label">City</div>
+            <input className="form-input" value={theme.weatherCity}
+              onChange={e => set('weatherCity', e.target.value)} placeholder="Bhaluka" />
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="section-label">Battery</div>
+          <div className="range-row">
+            <input type="range" className="form-range" min="1" max="100" step="1"
+              value={theme.batteryPct}
+              onChange={e => set('batteryPct', parseInt(e.target.value))} />
+            <span className="range-val">{theme.batteryPct}%</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── RIGHT PANEL ──
+  const renderRightPanel = () => {
+    if (activeTab === 'widgets') {
+      return (
+        <>
+          <div className="panel-header">
+            <div className="panel-title">Widgets</div>
+            <div className="panel-sub">Toggle overlay components</div>
+          </div>
+          <div className="panel-scroll">
+            {WIDGETS.map(w => (
+              <div key={w.id}
+                className={`widget-card ${selectedWidget === w.id ? 'active' : ''}`}
+                onClick={() => setSelectedWidget(selectedWidget === w.id ? null : w.id)}
+              >
+                <div className="widget-card-header">
+                  <div className="widget-icon" style={{ background: w.color + '22' }}>
+                    <span>{w.icon}</span>
+                  </div>
+                  <div className="widget-info">
+                    <div className="widget-name">{w.name}</div>
+                    <div className="widget-desc">{w.desc}</div>
+                  </div>
+                  <div className={`widget-check ${theme[w.id] ? 'on' : 'off'}`}
+                    onClick={e => { e.stopPropagation(); set(w.id, !theme[w.id]); }}>
+                    {theme[w.id] && <span className="widget-check-mark">✓</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+              <div className="section-label" style={{ marginBottom: 10 }}>Global Toggles</div>
+              <div className="toggle-row">
+                <span className="toggle-label">All Widgets</span>
+                <Toggle on={WIDGETS.every(w => theme[w.id])}
+                  onChange={v => WIDGETS.forEach(w => set(w.id, v))} />
+              </div>
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    if (activeTab === 'export') {
+      return (
+        <>
+          <div className="panel-header">
+            <div className="panel-title">Export Theme</div>
+            <div className="panel-sub">Copy config for your app</div>
+          </div>
+          <div className="panel-scroll">
+            <div className="export-card">
+              <div className="export-card-title">React Native Config</div>
+              <div className="export-card-desc">
+                Paste into your theme.ts file in the Expo project. Works with NativeWind v5 + date-fns.
+              </div>
+              <div className="export-code">{generateThemeCode(theme)}</div>
+            </div>
+            <button className="btn-primary" style={{ width: '100%', padding: '10px', marginBottom: 8, fontSize: 13 }}
+              onClick={() => {
+                navigator.clipboard?.writeText(generateThemeCode(theme));
+                showToast('Copied to clipboard!');
+              }}>
+              Copy Config
+            </button>
+            <div className="export-card">
+              <div className="export-card-title">Theme JSON</div>
+              <div className="export-card-desc">Raw theme values for storage or sync.</div>
+              <div className="export-code">{JSON.stringify({
+                id: activePreset,
+                ...theme,
+              }, null, 2).substring(0, 400)}...</div>
+            </div>
+            <button className="btn-ghost" style={{ width: '100%', padding: '10px', fontSize: 13 }}
+              onClick={() => showToast('Theme saved locally!')}>
+              Save to Library
+            </button>
+          </div>
+        </>
+      );
+    }
+
+    // Design tab right panel
+    return (
+      <>
+        <div className="panel-header">
+          <div className="panel-title">Live Inspector</div>
+          <div className="panel-sub">Real-time overlay metrics</div>
+        </div>
+        <div className="panel-scroll">
+          <div style={{ marginBottom: 14 }}>
+            <div className="section-label">Active Preset</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: theme.accentColor }}></div>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>
+                {PRESETS.find(p => p.id === activePreset)?.name || 'Custom'}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <div className="section-label">Widget Status</div>
+            {WIDGETS.map(w => (
+              <div key={w.id} className="toggle-row" style={{ marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: theme[w.id] ? 'var(--text)' : 'var(--text3)' }}>
+                  {w.icon} {w.name}
+                </span>
+                <Toggle on={theme[w.id]} onChange={v => set(w.id, v)} />
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <div className="section-label">Overlay Specs</div>
+            {[
+              ['Background', PRESETS.find(p => p.id === activePreset)?.name || theme.bgKey],
+              ['Clock Font', theme.clockFont],
+              ['Accent', theme.accentColor],
+              ['Opacity', `${Math.round(theme.overlayOpacity * 100)}%`],
+              ['Battery', `${theme.batteryPct}%`],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                <span style={{ fontSize: 10, color: 'var(--text3)' }}>{k}</span>
+                <span style={{ fontSize: 10, color: 'var(--text)', fontWeight: 600, fontFamily: 'Space Mono, monospace' }}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ background: 'var(--bg2)', borderRadius: 10, padding: 12, border: '1px solid var(--border2)' }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text2)', marginBottom: 6 }}>Android Permissions</div>
+            {[
+              ['SYSTEM_ALERT_WINDOW', true],
+              ['USE_FULL_SCREEN_INTENT', true],
+              ['RECEIVE_BOOT_COMPLETED', true],
+              ['FOREGROUND_SERVICE', false],
+            ].map(([p, granted]) => (
+              <div key={p} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'Space Mono, monospace' }}>{p}</span>
+                <span style={{ fontSize: 9, color: granted ? 'var(--accent)' : 'var(--red)', fontWeight: 700 }}>
+                  {granted ? '✓' : '○'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <>
+      {/* TOP NAV */}
+      <div className="topnav">
+        <div className="logo">
+          <div className="logo-dot"></div>
+          InformaTheme
+        </div>
+        <div className="nav-tabs">
+          {[['design','Design'],['widgets','Widgets'],['export','Export']].map(([id,label]) => (
+            <button key={id} className={`nav-tab ${activeTab === id ? 'active' : ''}`}
+              onClick={() => setActiveTab(id)}>{label}</button>
+          ))}
+        </div>
+        <div className="nav-right">
+          <button className="btn-ghost" onClick={() => showToast('Theme reset to default')}>Reset</button>
+          <button className="btn-primary" onClick={() => { setActiveTab('export'); showToast('Ready to export!'); }}>
+            Export Theme
+          </button>
+        </div>
+      </div>
+
+      {/* BODY */}
+      <div className="app-body">
+
+        {/* LEFT SIDEBAR */}
+        <div className="sidebar">
+          <div className="sidebar-tabs">
+            <button className={`sidebar-tab ${sidebarTab === 'presets' ? 'active' : ''}`}
+              onClick={() => setSidebarTab('presets')}>Presets</button>
+            <button className={`sidebar-tab ${sidebarTab === 'style' ? 'active' : ''}`}
+              onClick={() => setSidebarTab('style')}>Style</button>
+          </div>
+          {renderSidebar()}
+        </div>
+
+        {/* CANVAS */}
+        <PhoneCanvas theme={theme} />
+
+        {/* RIGHT PANEL */}
+        <div className="right-panel">
+          {renderRightPanel()}
+        </div>
+
+      </div>
+
+      {/* TOAST */}
+      {toast && <div className="toast">{toast}</div>}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

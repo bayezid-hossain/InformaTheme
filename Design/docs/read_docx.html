@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<pre id="out">Loading...</pre>
+<script>
+async function run() {
+  const out = document.getElementById('out');
+  try {
+    const resp = await fetch('uploads/lockscreen_app.docx');
+    const blob = await resp.blob();
+    out.textContent = 'Loaded: ' + blob.size + ' bytes\n';
+    
+    const zip = await JSZip.loadAsync(blob);
+    out.textContent += 'ZIP files: ' + Object.keys(zip.files).join(', ') + '\n\n';
+    
+    // Read word/document.xml
+    const docXml = await zip.file('word/document.xml').async('string');
+    out.textContent += 'document.xml length: ' + docXml.length + '\n\n';
+    
+    // Extract text from w:t tags
+    const matches = docXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+    const text = matches.map(m => m.replace(/<[^>]+>/g, '')).join(' ');
+    out.textContent += 'TEXT:\n' + text;
+    
+    // Store in window for retrieval
+    window.__docText = text;
+    window.__zipFiles = Object.keys(zip.files);
+  } catch(e) {
+    out.textContent = 'Error: ' + e.message + '\n' + e.stack;
+  }
+}
+run();
+</script>
+</body>
+</html>

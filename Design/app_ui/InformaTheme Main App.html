@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InformaTheme — Main App Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: #0d0f12; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; }
+</style>
+</head>
+<body>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="android-frame.jsx"></script>
+<script type="text/babel" src="app-screens.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+// ── THEME TOKENS FOR 3 VARIANTS ───────────────────────────────
+
+const THEME_DARK = {
+  name: 'Dark Premium',
+  bg: '#0d0f12',
+  surface: '#13161c',
+  card: '#1a1e27',
+  bgHover: '#1f2433',
+  border: 'rgba(255,255,255,0.07)',
+  text: '#e8ecf2',
+  text2: '#8892a4',
+  text3: '#4a5568',
+  accent: '#4ade80',
+  accentDim: 'rgba(74,222,128,0.15)',
+  statusBg: 'transparent',
+};
+
+const THEME_WARM = {
+  name: 'Warm Light',
+  bg: '#faf7f2',
+  surface: '#ffffff',
+  card: '#ffffff',
+  bgHover: '#f0ece4',
+  border: 'rgba(0,0,0,0.07)',
+  text: '#1a1a1a',
+  text2: '#6b6b6b',
+  text3: '#9a9a9a',
+  accent: '#2d7a4a',
+  accentDim: 'rgba(45,122,74,0.12)',
+  statusBg: '#faf7f2',
+};
+
+const THEME_GLASS = {
+  name: 'Glassmorphism',
+  bg: 'linear-gradient(145deg, #0f1f14 0%, #0a1020 50%, #1a0f20 100%)',
+  bgSolid: '#0f1a14',
+  surface: 'rgba(255,255,255,0.06)',
+  card: 'rgba(255,255,255,0.08)',
+  bgHover: 'rgba(255,255,255,0.05)',
+  border: 'rgba(255,255,255,0.12)',
+  text: '#f0f4f0',
+  text2: '#9aafa0',
+  text3: '#5a7060',
+  accent: '#4ade80',
+  accentDim: 'rgba(74,222,128,0.15)',
+  statusBg: 'transparent',
+  glass: true,
+};
+
+// ── PHONE FRAME WRAPPER ───────────────────────────────────────
+function PhoneApp({ appTheme, startScreen, frameStyle = 'dark' }) {
+  const bgStyle = appTheme.glass
+    ? { background: appTheme.bg }
+    : { background: appTheme.bg };
+
+  return (
+    <div style={{
+      width: 375, height: 812,
+      borderRadius: 52, overflow: 'hidden',
+      position: 'relative',
+      boxShadow: frameStyle === 'dark'
+        ? '0 0 0 10px #1a1e27, 0 0 0 12px #2a2e3a, 0 30px 80px rgba(0,0,0,0.7)'
+        : frameStyle === 'warm'
+        ? '0 0 0 10px #e8e0d4, 0 0 0 12px #d0c8bc, 0 30px 60px rgba(0,0,0,0.25)'
+        : '0 0 0 10px rgba(255,255,255,0.08), 0 0 0 12px rgba(255,255,255,0.04), 0 30px 80px rgba(0,0,0,0.6)',
+    }}>
+      {/* Dynamic island */}
+      <div style={{
+        position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)',
+        width: 126, height: 34, borderRadius: 20, background: '#000', zIndex: 200,
+      }} />
+      {/* Screen bg */}
+      <div style={{ width: '100%', height: '100%', ...bgStyle, display: 'flex', flexDirection: 'column' }}>
+        <AppShell appTheme={appTheme} startScreen={startScreen} />
+      </div>
+    </div>
+  );
+}
+
+// ── SCREEN SELECTOR UNDER EACH PHONE ─────────────────────────
+function ScreenPicker({ current, onChange }) {
+  const screens = ['onboarding','home','dates','widgets','wallpapers','settings'];
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 375 }}>
+      {screens.map(s => (
+        <button key={s} onClick={() => onChange(s)} style={{
+          padding: '5px 12px', borderRadius: 99, border: '1px solid rgba(255,255,255,0.12)',
+          background: current === s ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.05)',
+          color: current === s ? '#4ade80' : 'rgba(255,255,255,0.5)',
+          fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+          textTransform: 'capitalize',
+        }}>{s}</button>
+      ))}
+    </div>
+  );
+}
+
+// ── VARIANT ARTBOARD ─────────────────────────────────────────
+function VariantBoard({ appTheme, frameStyle, label, desc }) {
+  const [screen, setScreen] = useState('home');
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
+      <PhoneApp appTheme={appTheme} startScreen={screen} frameStyle={frameStyle} />
+      <ScreenPicker current={screen} onChange={setScreen} />
+    </div>
+  );
+}
+
+// ── ONBOARDING STEP PREVIEW (static, for canvas) ─────────────
+const OB_STEPS = [
+  { icon: '🔒', iconBg: '#4ade8020', title: 'Your Life, Always Visible', body: 'InformaTheme places your most precious milestones right on your lockscreen.', cta: 'Get Started', color: '#4ade80' },
+  { icon: '🌱', iconBg: '#34d39920', title: 'Add Your Anchor Dates', body: "Tell us what matters: a child's birthday, a wedding date, a personal goal. We'll track every day since.", cta: 'Continue', color: '#34d399' },
+  { icon: '🎨', iconBg: '#a78bfa20', title: 'Pick Your Theme', body: 'Choose from nature-inspired lockscreen themes or design your own with custom colors and widgets.', cta: 'Continue', color: '#a78bfa' },
+  { icon: '🛡', iconBg: '#fb923c20', title: 'Grant Permissions', body: "To show your overlay on the lockscreen, we need two Android permissions. We'll walk you through each one.", cta: 'Grant Permissions', color: '#fb923c', perms: true },
+];
+
+function OnboardingStepPreview({ theme, stepIdx }) {
+  const s = OB_STEPS[stepIdx];
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingTop: 44 }}>
+      <div style={{ height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: theme.text, fontFamily: 'Space Mono' }}>09:41</span>
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center', color: theme.text }}><span style={{ fontSize: 13 }}>●●●</span></div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '12px 0' }}>
+        {OB_STEPS.map((_,i) => (
+          <div key={i} style={{ width: i === stepIdx ? 24 : 7, height: 7, borderRadius: 4, background: i === stepIdx ? s.color : i < stepIdx ? s.color + '60' : theme.border }} />
+        ))}
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px 32px' }}>
+        <div style={{ fontSize: 64, marginBottom: 28 }}>{s.icon}</div>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: theme.text, textAlign: 'center', lineHeight: 1.25, marginBottom: 12 }}>{s.title}</h1>
+        <p style={{ fontSize: 14, color: theme.text2, textAlign: 'center', lineHeight: 1.65, marginBottom: 28 }}>{s.body}</p>
+        {s.perms && (
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 10 }}>
+            {['Display over other apps', 'Full Screen Intent'].map((p, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: theme.card, borderRadius: 14, padding: '12px 14px', border: `1px solid ${theme.border}` }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: theme.bgHover, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><span style={{ fontSize: 16 }}>🔐</span></div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: theme.text }}>{p}</div>
+                  <div style={{ fontSize: 10, color: theme.text3 }}>Required for lockscreen overlay</div>
+                </div>
+                <button style={{ padding: '5px 10px', borderRadius: 8, border: 'none', background: s.color, color: '#000', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>Grant</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{ padding: '0 24px 48px' }}>
+        <button style={{ width: '100%', padding: '16px', borderRadius: 16, border: 'none', background: s.color, color: '#000', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{s.cta}</button>
+        {stepIdx < 3 && <div style={{ textAlign: 'center', marginTop: 12, fontSize: 13, color: theme.text3 }}>Skip for now</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN ─────────────────────────────────────────────────────
+function Main() {
+  const [tweaks, setTweaks] = useTweaks(/*EDITMODE-BEGIN*/{
+    "showOnboarding": true,
+    "showDark": true,
+    "showWarm": true,
+    "showGlass": true,
+    "canvasLabel": "InformaTheme — Main App"
+  }/*EDITMODE-END*/);
+
+  return (
+    <DesignCanvas label={tweaks.canvasLabel}>
+      <DCSection id="variants" title="Visual Variants">
+        {tweaks.showDark && (
+          <DCArtboard id="dark" label="A — Dark Premium" width={375} height={950}>
+            <VariantBoard appTheme={THEME_DARK} frameStyle="dark" label="A" desc="Dark Premium" />
+          </DCArtboard>
+        )}
+        {tweaks.showWarm && (
+          <DCArtboard id="warm" label="B — Warm Light" width={375} height={950}>
+            <VariantBoard appTheme={THEME_WARM} frameStyle="warm" label="B" desc="Warm Light" />
+          </DCArtboard>
+        )}
+        {tweaks.showGlass && (
+          <DCArtboard id="glass" label="C — Glassmorphism" width={375} height={950}>
+            <VariantBoard appTheme={THEME_GLASS} frameStyle="glass" label="C" desc="Glassmorphism" />
+          </DCArtboard>
+        )}
+      </DCSection>
+
+      {tweaks.showOnboarding && (
+        <DCSection id="onboarding" title="Onboarding Flow">
+          {[0,1,2,3].map(step => (
+            <DCArtboard key={step} id={`onboarding-${step}`} label={`Onboarding ${step+1}/4`} width={375} height={900}>
+              <div style={{
+                width: 375, height: 812,
+                borderRadius: 52, overflow: 'hidden',
+                boxShadow: '0 0 0 10px #1a1e27, 0 0 0 12px #2a2e3a, 0 20px 60px rgba(0,0,0,0.7)',
+                background: THEME_DARK.bg, fontFamily: "'Plus Jakarta Sans', sans-serif",
+                display: 'flex', flexDirection: 'column',
+                position: 'relative',
+              }}>
+                <div style={{ position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)', width: 126, height: 34, borderRadius: 20, background: '#000', zIndex: 200 }} />
+                <OnboardingStepPreview theme={THEME_DARK} stepIdx={step} />
+              </div>
+            </DCArtboard>
+          ))}
+        </DCSection>
+      )}
+
+      <TweaksPanel>
+        <TweakSection title="Visible Variants">
+          <TweakToggle label="Dark Premium" value={tweaks.showDark} onChange={v => setTweak('showDark', v)} />
+          <TweakToggle label="Warm Light" value={tweaks.showWarm} onChange={v => setTweak('showWarm', v)} />
+          <TweakToggle label="Glassmorphism" value={tweaks.showGlass} onChange={v => setTweak('showGlass', v)} />
+        </TweakSection>
+        <TweakSection title="Sections">
+          <TweakToggle label="Onboarding Flow" value={tweaks.showOnboarding} onChange={v => setTweak('showOnboarding', v)} />
+        </TweakSection>
+      </TweaksPanel>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Main />);
+</script>
+</body>
+</html>
