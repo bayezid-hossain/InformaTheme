@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TopBar } from '../../components/TopBar';
 import { useTheme } from '../../hooks/useTheme';
+import { Plus, Check } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 const CARD_W = (width - 52) / 2;
@@ -31,7 +32,7 @@ export function WallpapersScreen() {
           className="rounded-2xl border-dashed border p-7 items-center mb-6"
           style={{ backgroundColor: colors.bg2, borderColor: colors.border }}
         >
-          <Text className="text-[32px] mb-2" style={{ color: colors.text3 }}>+</Text>
+          <Plus size={32} color={colors.text3} className="mb-2" />
           <Text className="text-[15px] font-semibold" style={{ color: colors.text2 }}>Upload Custom</Text>
           <Text className="text-xs mt-1" style={{ color: colors.text3 }}>JPG or PNG</Text>
         </TouchableOpacity>
@@ -52,7 +53,7 @@ export function WallpapersScreen() {
                   <View className="absolute bottom-0 left-0 right-0 h-[60%] opacity-60" style={{ backgroundColor: w.color2 }} />
                   {isActive && (
                     <View className="absolute top-2 right-2 w-6 h-6 rounded-full justify-center items-center" style={{ backgroundColor: colors.accent }}>
-                      <Text className="text-xs font-bold text-black">✓</Text>
+                      <Check size={14} color="#000" strokeWidth={3} />
                     </View>
                   )}
                 </View>

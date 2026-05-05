@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, Platform } from 'react-native';
+import { Lock, Sprout, Palette, Smartphone, Bell } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -22,20 +23,19 @@ interface Props {
 
 export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
   const [step, setStep] = useState(initialStep);
-  const [waiting, setWaiting] = useState<'overlay' | 'fsi' | null>(null);
+  const [waiting, setWaiting] = useState<'overlay' | 'fsi' | 'notifications' | null>(null);
+  const androidVersion = parseInt(Platform.Version.toString(), 10);
+  const needsNotifPerm = Platform.OS === 'android' && androidVersion >= 33;
   const perms = usePermissions();
   const accent = STEP_ACCENT[step];
     const isLast = step === 3;
 
-  // Auto-advance when permission returns after coming back from Settings
+  // Clear waiting state when the corresponding permission is granted
   useEffect(() => {
-    if (waiting === 'overlay' && perms.overlay) {
-      setWaiting(null);
-    }
-    if (waiting === 'fsi' && perms.fullScreenIntent) {
-      setWaiting(null);
-    }
-  }, [perms.overlay, perms.fullScreenIntent, waiting]);
+    if (waiting === 'overlay'        && perms.overlay)           setWaiting(null);
+    if (waiting === 'fsi'            && perms.fullScreenIntent)  setWaiting(null);
+    if (waiting === 'notifications'  && perms.notifications)     setWaiting(null);
+  }, [perms.overlay, perms.fullScreenIntent, perms.notifications, waiting]);
 
   function grantOverlay() {
     if (perms.overlay) return;
@@ -49,20 +49,25 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
     setWaiting('fsi');
   }
 
+  async function grantNotifications() {
+    if (perms.notifications || !needsNotifPerm) return;
+    setWaiting('notifications');
+    await perms.requestNotifications();
+  }
+
+  const allGranted = perms.overlay && perms.fullScreenIntent && (!needsNotifPerm || perms.notifications);
+
   function handleCTA() {
-    if (!isLast) {
-      setStep((s) => s + 1);
-      return;
-    }
-    // Last step: grant both if needed, then finish
-    if (!perms.overlay) { grantOverlay(); return; }
-    if (!perms.fullScreenIntent) { grantFSI(); return; }
+    if (!isLast) { setStep((s) => s + 1); return; }
+    if (!perms.overlay)          { grantOverlay();       return; }
+    if (!perms.fullScreenIntent) { grantFSI();           return; }
+    if (needsNotifPerm && !perms.notifications) { grantNotifications(); return; }
     onDone();
   }
 
   function ctaLabel() {
     if (!isLast) return step === 0 ? 'Get Started' : 'Continue';
-    if (!perms.overlay || !perms.fullScreenIntent) return 'Grant Permissions';
+    if (!allGranted) return 'Grant Permissions';
     return "Let's Go";
   }
 
@@ -88,9 +93,9 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
         {!isLast ? (
           <>
             {/* Icon */}
-            <Text style={{ fontSize: 72, marginBottom: 32 }}>
-              {step === 0 ? '🔒' : step === 1 ? '🌱' : '🎨'}
-            </Text>
+            <View style={{ marginBottom: 32 }}>
+              {step === 0 ? <Lock size={72} color={TEXT} /> : step === 1 ? <Sprout size={72} color={TEXT} /> : <Palette size={72} color={TEXT} />}
+            </View>
             {/* Title */}
             <Text style={{ fontSize: 28, fontWeight: '800', color: TEXT, textAlign: 'center', marginBottom: 16, lineHeight: 36 }}>
               {step === 0 ? 'Your Life, Always Visible' :
@@ -130,7 +135,7 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
               gap: 12,
             }}>
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: perms.overlay ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ fontSize: 18 }}>🔒</Text>
+                <Lock size={18} color={TEXT} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: TEXT, marginBottom: 2 }}>
@@ -171,7 +176,7 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
               gap: 12,
             }}>
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: perms.fullScreenIntent ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ fontSize: 18 }}>📱</Text>
+                <Smartphone size={18} color={TEXT} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: TEXT, marginBottom: 2 }}>
@@ -198,6 +203,50 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
                 </TouchableOpacity>
               )}
             </View>
+
+            {/* Notifications permission card (Android 13+) */}
+            {needsNotifPerm && (
+              <View style={{
+                width: width - 64,
+                backgroundColor: CARD_BG,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: BORDER,
+                padding: 16,
+                marginTop: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+              }}>
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: perms.notifications ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' }}>
+                  <Bell size={18} color={TEXT} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: TEXT, marginBottom: 2 }}>
+                    Notifications
+                  </Text>
+                  <Text style={{ fontSize: 11, color: TEXT3 }}>
+                    Required to trigger lockscreen overlay
+                  </Text>
+                </View>
+                {perms.notifications ? (
+                  <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(74,222,128,0.15)' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#4ADE80' }}>✓</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={grantNotifications}
+                    style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, backgroundColor: accent }}
+                  >
+                    {waiting === 'notifications' ? (
+                      <ActivityIndicator size="small" color="#000" />
+                    ) : (
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#000' }}>Grant</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
             {/* FSI hint if system page not found */}
             {!perms.fullScreenIntent && (

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useBattery } from '../hooks/useBattery';
+import { Zap } from 'lucide-react-native';
 
 interface Props {
   color?: string;
@@ -39,7 +40,7 @@ export function BatteryWidget({ color = '#4ade80' }: Props) {
         />
         {/* Bolt icon */}
         {charging && (
-          <Text className="absolute text-white font-bold z-10" style={{ fontSize: 16 }}>⚡</Text>
+          <Zap size={16} color="white" fill="white" className="absolute z-10" />
         )}
         {/* Pct text */}
         <Text className="z-10 font-bold text-white text-sm">{pct}%</Text>

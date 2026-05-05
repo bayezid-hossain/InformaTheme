@@ -1,25 +1,66 @@
 import React from 'react';
-import { View, Text, Dimensions } from 'react-native';
+import { View, Text, Dimensions, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Clock } from './Clock';
 import { GlassBubble } from './GlassBubble';
 import { MilestoneBubble } from './MilestoneBubble';
 import { BatteryWidget } from './BatteryWidget';
 import { useTheme } from '../hooks/useTheme';
+import { useWeather } from '../hooks/useWeather';
+import { Gift, Zap, Phone, Camera } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 const PHONE_W = width - 64;
 const PHONE_H = PHONE_W * 2.1;
 
-const PRIMARY_DATE = { label: "Luka's Birthday", date: new Date('2020-06-15'), type: 'birthday' as const };
-const SECONDARY_DATE = { label: 'Anniversary', date: new Date('2018-09-22'), type: 'anniversary' as const };
+const PRIMARY_DATE = { label: "Luka's Live Age", date: new Date('2022-06-03'), type: 'birthday' as const };
+const SECONDARY_DATE = { label: 'Anniversary', date: new Date('2023-05-10'), type: 'anniversary' as const };
+
+function renderBackground(variant: string, colors: any) {
+  switch (variant) {
+    case 'deepForest':
+    case 'softSage':
+      return (
+        <View style={StyleSheet.absoluteFillObject}>
+          {/* Trees / Waves */}
+          <View style={{ position: 'absolute', bottom: -50, left: -20, width: 80, height: 350, borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.1)' }} />
+          <View style={{ position: 'absolute', bottom: -20, left: 80, width: 70, height: 400, borderRadius: 35, backgroundColor: 'rgba(0,0,0,0.15)' }} />
+          <View style={{ position: 'absolute', bottom: -60, right: 30, width: 90, height: 380, borderRadius: 45, backgroundColor: 'rgba(0,0,0,0.1)' }} />
+          <View style={{ position: 'absolute', bottom: 0, left: -100, width: 600, height: 200, borderRadius: 300, backgroundColor: 'rgba(255,255,255,0.03)' }} />
+        </View>
+      );
+    case 'midnightStars':
+    case 'oceanDive':
+      return (
+        <View style={StyleSheet.absoluteFillObject}>
+          {/* Stars / Bubbles and central circle */}
+          <View style={{ position: 'absolute', top: 100, left: 20, width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)' }} />
+          <View style={{ position: 'absolute', top: 150, right: 40, width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.6)' }} />
+          <View style={{ position: 'absolute', top: 300, left: 60, width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.3)' }} />
+          <View style={{ position: 'absolute', top: '45%', left: '20%', width: '60%', aspectRatio: 1, borderRadius: 1000, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+        </View>
+      );
+    case 'warmEarth':
+      return (
+        <View style={StyleSheet.absoluteFillObject}>
+          {/* Large warm circles */}
+          <View style={{ position: 'absolute', top: '35%', left: '-10%', width: '120%', aspectRatio: 1, borderRadius: 1000, backgroundColor: 'rgba(0,0,0,0.15)' }} />
+        </View>
+      );
+    default:
+      return null;
+  }
+}
 
 export function LockscreenPreview() {
-  const { colors } = useTheme();
+  const { colors, variant } = useTheme();
+  const { weather: weatherData } = useWeather();
+  const tagline = colors.tagline || 'BEST YEARS AHEAD';
+  const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'short', month: '2-digit', day: '2-digit' }).replace(',', '').toUpperCase();
+  const taglineText = `${todayDate} ▼ ${tagline} ▼`;
 
   return (
     <View className="items-center">
-      {/* Phone frame */}
       <View
         className="overflow-hidden"
         style={{
@@ -28,53 +69,91 @@ export function LockscreenPreview() {
           borderRadius: 44,
           borderWidth: 2,
           borderColor: colors.border,
+          backgroundColor: colors.bg,
         }}
       >
         <LinearGradient
-          colors={['#0f1f14', '#0a1020', '#1a0f20']}
+          colors={[colors.bg, colors.bg1, colors.bg2]}
           start={{ x: 0.2, y: 0 }}
           end={{ x: 0.8, y: 1 }}
-          style={{ flex: 1, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 24, gap: 8 }}
-        >
+          style={StyleSheet.absoluteFillObject}
+        />
+        
+        {renderBackground(variant, colors)}
+
+        <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 24 }}>
+          {/* Battery */}
+          <View style={{ alignItems: 'center', marginBottom: 12 }}>
+            <BatteryWidget color={colors.accent} />
+          </View>
 
           {/* Date tagline */}
-          <Text className="text-center" style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 4 }}>
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          <Text className="text-center" style={{ fontSize: 10, color: colors.text, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>
+            {taglineText}
           </Text>
 
           {/* Clock */}
-          <View className="items-center" style={{ marginVertical: 4 }}>
-            <Clock style="stencil" color="#ffffff" />
+          <View className="items-center" style={{ marginBottom: 16 }}>
+            <Clock style="stencil" color={colors.text} size={80} />
           </View>
 
           {/* Milestone bubble */}
           <MilestoneBubble primary={PRIMARY_DATE} secondary={SECONDARY_DATE} accentColor={colors.accent} />
 
+          {/* First Steps Progress */}
+          <View style={{ marginTop: 16, marginBottom: 8 }}>
+            <Text style={{ fontSize: 11, color: colors.text2, fontWeight: '600' }}>Luka's First Steps:</Text>
+            <Text style={{ fontSize: 18, color: colors.text, fontWeight: '800', marginBottom: 6 }}>1011 Days Ago</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <View key={i} style={{ height: 4, flex: 1, backgroundColor: i <= 2 ? colors.accent : colors.card, borderRadius: 2 }} />
+              ))}
+              <Text style={{ fontSize: 10, color: colors.text3, fontWeight: '700', marginLeft: 4 }}>45678</Text>
+            </View>
+          </View>
+
           {/* Event pill */}
-          <GlassBubble pill style={{ alignSelf: 'flex-start' }}>
-            <Text style={{ fontSize: 11, color: '#fff' }}>🎂 Wife's Birthday · 18 days</Text>
+          <GlassBubble pill style={{ alignSelf: 'flex-start', marginTop: 12, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 12, color: colors.text, fontWeight: '700' }}>Wife's Birthday: 18 Days</Text>
+              <Gift size={14} color="#F87171" />
+            </View>
           </GlassBubble>
+
+          <Text style={{ fontSize: 11, color: colors.text2, marginTop: 12, fontWeight: '500' }}>
+            Fortunately, you will always be by my side, too.
+          </Text>
 
           {/* Spacer */}
           <View className="flex-1" />
 
-          {/* Battery */}
-          <BatteryWidget color={colors.accent} />
+          {/* Bottom Indicators */}
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+            <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+              <Text style={{ fontSize: 10, color: colors.text, fontWeight: '700' }}>TODAY, {new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()}</Text>
+            </View>
+          </View>
+          <View style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 8 }}>
+            <Text style={{ fontSize: 10, color: colors.accent, fontWeight: '700' }}>BATTERY 100%</Text>
+          </View>
+          <View style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 24 }}>
+            <Text style={{ fontSize: 10, color: colors.text, fontWeight: '700' }}>WEATHER {weatherData.temp}°C ({weatherData.location})</Text>
+          </View>
+
+          {/* Unlock Slider */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+            <View style={{ width: 80, height: 36, backgroundColor: colors.accent, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginLeft: 8 }}>
+              <Zap size={18} color={colors.bg} fill={colors.bg} />
+            </View>
+            <View style={{ width: 6, height: 20, backgroundColor: colors.text3, borderRadius: 3, marginLeft: 8 }} />
+          </View>
 
           {/* Goal */}
-          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-            Current Goal: <Text style={{ color: colors.accent }}>Stay consistent 🌱</Text>
+          <Text style={{ fontSize: 11, color: colors.text2, fontWeight: '600' }}>
+            Current Goal: <Text style={{ color: colors.text }}>Make memories.</Text>
           </Text>
-
-          {/* Bottom icons */}
-          <View className="flex-row justify-between items-center mt-2 px-4">
-            {['📞', '📸', '⚡'].map((icon, i) => (
-              <View key={i} className="w-12 h-12 rounded-full items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-                <Text style={{ fontSize: 20 }}>{icon}</Text>
-              </View>
-            ))}
-          </View>
-        </LinearGradient>
+        </View>
       </View>
     </View>
   );

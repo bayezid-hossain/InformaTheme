@@ -60,13 +60,22 @@ class LockscreenModule(private val reactContext: ReactApplicationContext) :
             val theme = JSONObject(themeJson)
 
             prefs.edit()
+                .putString("variant", theme.optString("variant", "darkPremium"))
                 .putString("bg", theme.optString("bg", "#0d0f12"))
+                .putString("bg1", theme.optString("bg1", "#13161c"))
+                .putString("bg2", theme.optString("bg2", "#1a1e27"))
                 .putString("accent", theme.optString("accent", "#4ade80"))
                 .putString("text", theme.optString("text", "#e8ecf2"))
                 .putString("text2", theme.optString("text2", "#8892a4"))
                 .putString("text3", theme.optString("text3", "#4a5568"))
+                .putString("tagline", theme.optString("tagline", "BEST YEARS AHEAD"))
+                .putString("weather", theme.optString("weather", "WEATHER 22°C (Bhaluka)"))
                 .putString("dates", datesJson)
                 .apply()
+
+            // Notify Activity to refresh if running
+            val intent = Intent("com.informatheme.app.DATA_UPDATED")
+            reactContext.sendBroadcast(intent)
 
             promise.resolve(true)
         } catch (e: Exception) {

@@ -9,9 +9,14 @@ import { useAlert } from '../../hooks/useAlert';
 import { DateType } from '../../hooks/useDateStore';
 import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
 import { useTheme } from '../../hooks/useTheme';
+import { Calendar as CalendarIcon, Cake, Heart, Star } from 'lucide-react-native';
 
 const TYPE_FILTERS = ['All', 'Birthday', 'Anniversary', 'Milestone'] as const;
-const TYPE_ICONS: Record<DateType, string> = { birthday: '🎂', anniversary: '💍', milestone: '⭐' };
+const TYPE_ICONS: Record<DateType, React.ReactElement> = { 
+  birthday: <Cake size={14} />, 
+  anniversary: <Heart size={14} />, 
+  milestone: <Star size={14} /> 
+};
 const TYPE_COLOR: Record<DateType, string> = { birthday: '#4ADE80', anniversary: '#F472B6', milestone: '#FBBF24' };
 
 function liveAge(dateISO: string) {
@@ -83,7 +88,9 @@ export function DatesScreen() {
       <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, paddingTop: 8 }} showsVerticalScrollIndicator={false}>
         {filtered.length === 0 && (
           <View className="items-center py-16">
-            <Text className="text-5xl mb-3">📅</Text>
+            <View className="mb-3">
+              <CalendarIcon size={48} color={colors.text3} />
+            </View>
             <Text className="text-[15px] font-medium mb-1" style={{ color: colors.text }}>No dates yet</Text>
             <Text className="text-[13px]" style={{ color: colors.text3 }}>Tap + to add an anchor date</Text>
           </View>
@@ -96,7 +103,7 @@ export function DatesScreen() {
             <View key={d.id} className="rounded-2xl p-4 border mb-3" style={{ backgroundColor: colors.bg2, borderColor: colors.border }}>
               <View className="flex-row items-center gap-3 mb-3.5">
                 <View className="w-11 h-11 rounded-[10px] items-center justify-center" style={{ backgroundColor: `${typeColor}20` }}>
-                  <Text className="text-2xl">{d.icon}</Text>
+                  {React.cloneElement(TYPE_ICONS[d.type] as React.ReactElement<any>, { size: 24, color: typeColor })}
                 </View>
                 <View className="flex-1">
                   <Text className="text-base font-semibold" style={{ color: colors.text }}>{d.label}</Text>
@@ -187,11 +194,12 @@ export function DatesScreen() {
                     <TouchableOpacity
                       key={t}
                       onPress={() => setNewType(t)}
-                      className="flex-1 py-2.5 rounded-xl border items-center"
+                      className="flex-1 py-2.5 rounded-xl border items-center justify-center flex-row gap-1"
                       style={{ borderColor: newType === t ? colors.accent : colors.border, backgroundColor: newType === t ? colors.accentDim : 'transparent' }}
                     >
+                      {React.cloneElement(TYPE_ICONS[t] as React.ReactElement<any>, { color: newType === t ? colors.accent : colors.text3 })}
                       <Text className="text-[13px] font-medium" style={{ color: newType === t ? colors.accent : colors.text3 }}>
-                        {TYPE_ICONS[t]} {t}
+                        {t}
                       </Text>
                     </TouchableOpacity>
                   ))}

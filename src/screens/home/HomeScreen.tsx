@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { Sun, Flame, Moon, Bell, Lock, Unlock, Palette, LayoutGrid, Image as ImageIcon, Settings, Cake, Heart, Star } from 'lucide-react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { useDates } from '../../context/DateStoreContext';
 import { useOverlay } from '../../hooks/useOverlay';
@@ -13,14 +14,23 @@ const TYPE_COLOR: Record<string, string> = {
   milestone: '#FBBF24',
 };
 
+function getTypeIcon(type: string, color: string) {
+  switch (type) {
+    case 'birthday': return <Cake size={20} color={color} />;
+    case 'anniversary': return <Heart size={20} color={color} />;
+    case 'milestone': return <Star size={20} color={color} />;
+    default: return <Star size={20} color={color} />;
+  }
+}
+
 function greet() {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 }
 
-function greetEmoji() {
+function GreetIcon({ color }: { color: string }) {
   const h = new Date().getHours();
-  return h < 12 ? '☀️' : h < 17 ? '🔥' : '🌙';
+  return h < 12 ? <Sun size={14} color={color} /> : h < 17 ? <Flame size={14} color={color} /> : <Moon size={14} color={color} />;
 }
 
 function daysUntilNext(dateISO: string, type: string): number | null {
@@ -46,14 +56,8 @@ export function HomeScreen() {
   const overlay = useOverlay();
 
   const previewDates = dates.slice(0, 3);
-  const themeName = variant === 'darkPremium' ? 'Dark Premium' : variant === 'warmLight' ? 'Warm Light' : 'Glassmorphism';
-  const themeColors = [colors.accent, colors.bg2, colors.bg3, colors.text2];
-
-  // Sync data to native whenever theme or dates change
-  useEffect(() => {
-    overlay.syncData(colors, dates);
-  }, [colors, dates]);
-
+  const themeName = variant.charAt(0).toUpperCase() + variant.slice(1).replace(/([A-Z])/g, ' $1');
+  const themeColors = [colors.accent, colors.bg, colors.bg1, colors.bg2];
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top', 'bottom']}>
@@ -62,9 +66,12 @@ export function HomeScreen() {
         {/* Header */}
         <View className="flex-row items-center px-5 pt-5 pb-3 gap-3">
           <View className="flex-1">
-            <Text className="text-sm" style={{ color: colors.text2 }}>
-              {greet()} {greetEmoji()}
-            </Text>
+            <View className="flex-row items-center gap-1.5">
+              <Text className="text-sm" style={{ color: colors.text2 }}>
+                {greet()}
+              </Text>
+              <GreetIcon color={colors.text2} />
+            </View>
             <Text className="text-[28px] font-extrabold leading-8 mt-0.5" style={{ color: colors.text }}>
               Your Timeline
             </Text>
@@ -73,7 +80,7 @@ export function HomeScreen() {
             className="w-10 h-10 rounded-full border items-center justify-center"
             style={{ backgroundColor: colors.bg2, borderColor: colors.border }}
           >
-            <Text className="text-lg">🔔</Text>
+            <Bell size={20} color={colors.text} />
           </TouchableOpacity>
           <View
             className="w-10 h-10 rounded-full items-center justify-center"
@@ -89,7 +96,7 @@ export function HomeScreen() {
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center gap-3 flex-1">
                 <View className="w-10 h-10 rounded-xl items-center justify-center" style={{ backgroundColor: overlay.active ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)' }}>
-                  <Text className="text-xl">{overlay.active ? '🔒' : '🔓'}</Text>
+                  {overlay.active ? <Lock size={20} color={colors.accent} /> : <Unlock size={20} color={colors.text} />}
                 </View>
                 <View className="flex-1">
                   <Text className="text-[15px] font-bold" style={{ color: colors.text }}>Lockscreen Overlay</Text>
@@ -99,7 +106,7 @@ export function HomeScreen() {
                 </View>
               </View>
               <TouchableOpacity
-                onPress={() => overlay.toggle(colors, dates)}
+                onPress={() => overlay.toggle(variant, colors, dates)}
                 className="w-12 h-[28px] rounded-full justify-center"
                 style={{ backgroundColor: overlay.active ? colors.accent : colors.bg3 }}
               >
@@ -121,10 +128,10 @@ export function HomeScreen() {
                   ACTIVE THEME
                 </Text>
                 <Text className="text-[22px] font-extrabold" style={{ color: '#e8ecf2' }}>{themeName}</Text>
-                <Text className="text-xs mt-1" style={{ color: '#4a5568' }}>Last updated today</Text>
+                <Text className="text-xs mt-1" style={{ color: '#4a5568' }}>Tap to view all</Text>
               </View>
               <TouchableOpacity
-                onPress={() => navigation.navigate('Settings')}
+                onPress={() => navigation.navigate('Theme')}
                 className="px-4 py-2 rounded-xl"
                 style={{ backgroundColor: colors.accent }}
               >
@@ -178,7 +185,7 @@ export function HomeScreen() {
                       className="w-10 h-10 rounded-[10px] items-center justify-center"
                       style={{ backgroundColor: `${typeColor}20` }}
                     >
-                      <Text className="text-xl">{d.icon}</Text>
+                      {getTypeIcon(d.type, typeColor)}
                     </View>
                     {/* Label + age */}
                     <View className="flex-1">
@@ -215,15 +222,14 @@ export function HomeScreen() {
           )}
         </View>
 
-        {/* Quick Actions */}
-        <View className="px-5 mt-4">
+        <View className="px-5 mt-4 mb-4">
           <Text className="text-[17px] font-bold mb-3" style={{ color: colors.text }}>Quick Actions</Text>
           <View className="flex-row flex-wrap gap-3">
             {[
-              { label: 'Themes', icon: '🎨', screen: 'Settings', bg: 'rgba(167,139,250,0.12)', color: '#A78BFA' },
-              { label: 'Widgets', icon: '▦', screen: 'Widgets', bg: 'rgba(96,165,250,0.12)', color: '#60A5FA' },
-              { label: 'Wallpapers', icon: '🖼', screen: 'Wallpapers', bg: 'rgba(251,146,60,0.12)', color: '#FB923C' },
-              { label: 'Settings', icon: '⚙️', screen: 'Settings', bg: 'rgba(148,163,184,0.10)', color: '#94A3B8' },
+              { label: 'Themes', icon: <Palette size={22} color="#A78BFA" />, screen: 'Theme', bg: 'rgba(167,139,250,0.12)' },
+              { label: 'Widgets', icon: <LayoutGrid size={22} color="#60A5FA" />, screen: 'Widgets', bg: 'rgba(96,165,250,0.12)' },
+              { label: 'Wallpapers', icon: <ImageIcon size={22} color="#FB923C" />, screen: 'Wallpapers', bg: 'rgba(251,146,60,0.12)' },
+              { label: 'Settings', icon: <Settings size={22} color="#94A3B8" />, screen: 'Settings', bg: 'rgba(148,163,184,0.10)' },
             ].map((a) => (
               <TouchableOpacity
                 key={a.label}
@@ -235,28 +241,9 @@ export function HomeScreen() {
                   className="w-10 h-10 rounded-xl items-center justify-center mb-1"
                   style={{ backgroundColor: a.bg }}
                 >
-                  <Text className="text-xl">{a.icon}</Text>
+                  {a.icon}
                 </View>
                 <Text className="text-[14px] font-semibold" style={{ color: colors.text }}>{a.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Theme switcher (compact) */}
-        <View className="px-5 mt-5">
-          <Text className="text-[11px] font-bold tracking-[1.2px] mb-2.5" style={{ color: colors.text3 }}>SWITCH THEME</Text>
-          <View className="flex-row gap-2">
-            {(['darkPremium', 'warmLight', 'glassmorphism'] as const).map((v) => (
-              <TouchableOpacity
-                key={v}
-                onPress={() => setVariant(v)}
-                className="flex-1 py-2.5 rounded-xl border items-center"
-                style={{ borderColor: variant === v ? colors.accent : colors.border, backgroundColor: variant === v ? colors.accentDim : 'transparent' }}
-              >
-                <Text className="text-[12px] font-semibold" style={{ color: variant === v ? colors.accent : colors.text3 }}>
-                  {v === 'darkPremium' ? 'Dark' : v === 'warmLight' ? 'Warm' : 'Glass'}
-                </Text>
               </TouchableOpacity>
             ))}
           </View>

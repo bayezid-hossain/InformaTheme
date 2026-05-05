@@ -86,18 +86,21 @@ function withAndroidManifestPatch(config) {
           'android:showWhenLocked': 'true',
           'android:turnScreenOn': 'true',
           'android:launchMode': 'singleInstance',
-          'android:theme': '@android:style/Theme.Translucent.NoTitleBar.Fullscreen',
+          'android:theme': '@android:style/Theme.Black.NoTitleBar.Fullscreen',
           'android:exported': 'false',
+          'android:taskAffinity': '',
+          'android:excludeFromRecents': 'true',
         },
       });
     }
     app.activity = activities;
 
-    // MainActivity lockscreen flags
+    // Remove showWhenLocked from MainActivity — it causes the RN app to appear
+    // over the lockscreen as an unintended overlay when the app is in foreground.
     const mainActivity = activities.find((a) => a.$['android:name'] === '.MainActivity');
     if (mainActivity) {
-      mainActivity.$['android:showWhenLocked'] = 'true';
-      mainActivity.$['android:turnScreenOn'] = 'true';
+      delete mainActivity.$['android:showWhenLocked'];
+      delete mainActivity.$['android:turnScreenOn'];
     }
 
     // Receivers

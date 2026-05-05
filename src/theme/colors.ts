@@ -43,7 +43,87 @@ export const glassmorphism = {
   statusBg: 'transparent',
 } as const;
 
-export type ThemeVariant = 'darkPremium' | 'warmLight' | 'glassmorphism';
+export const deepForest = {
+  bg: '#0A1A10',
+  bg1: '#0F2417',
+  bg2: '#142E1E',
+  bg3: '#1A3825',
+  accent: '#4ADE80',
+  accentDim: 'rgba(74,222,128,0.15)',
+  text: '#F0FDF4',
+  text2: '#BBF7D0',
+  text3: '#86EFAC',
+  border: 'rgba(74,222,128,0.12)',
+  card: 'rgba(74,222,128,0.06)',
+  statusBg: 'transparent',
+  tagline: 'BEST YEARS AHEAD',
+} as const;
+
+export const softSage = {
+  bg: '#E2E8F0',
+  bg1: '#CBD5E1',
+  bg2: '#94A3B8',
+  bg3: '#64748B',
+  accent: '#4ADE80',
+  accentDim: 'rgba(74,222,128,0.2)',
+  text: '#0F172A',
+  text2: '#334155',
+  text3: '#475569',
+  border: 'rgba(0,0,0,0.1)',
+  card: 'rgba(0,0,0,0.05)',
+  statusBg: 'transparent',
+  tagline: 'ALL BEST 2025',
+} as const;
+
+export const midnightStars = {
+  bg: '#0B0F19',
+  bg1: '#111827',
+  bg2: '#1F2937',
+  bg3: '#374151',
+  accent: '#60A5FA',
+  accentDim: 'rgba(96,165,250,0.15)',
+  text: '#F8FAFC',
+  text2: '#E2E8F0',
+  text3: '#94A3B8',
+  border: 'rgba(96,165,250,0.12)',
+  card: 'rgba(96,165,250,0.06)',
+  statusBg: 'transparent',
+  tagline: 'REACH THE STARS',
+} as const;
+
+export const oceanDive = {
+  bg: '#081F2D',
+  bg1: '#0C2E42',
+  bg2: '#103D57',
+  bg3: '#144C6C',
+  accent: '#22D3EE',
+  accentDim: 'rgba(34,211,238,0.15)',
+  text: '#ECFEFF',
+  text2: '#CFFAFE',
+  text3: '#67E8F9',
+  border: 'rgba(34,211,238,0.12)',
+  card: 'rgba(34,211,238,0.06)',
+  statusBg: 'transparent',
+  tagline: 'DIVE DEEPER',
+} as const;
+
+export const warmEarth = {
+  bg: '#2C1A0D',
+  bg1: '#3E2513',
+  bg2: '#503019',
+  bg3: '#623B1F',
+  accent: '#FBBF24',
+  accentDim: 'rgba(251,191,36,0.15)',
+  text: '#FFFBEB',
+  text2: '#FEF3C7',
+  text3: '#FDE68A',
+  border: 'rgba(251,191,36,0.12)',
+  card: 'rgba(251,191,36,0.06)',
+  statusBg: 'transparent',
+  tagline: 'SEIZE THE DAY',
+} as const;
+
+export type ThemeVariant = 'darkPremium' | 'warmLight' | 'glassmorphism' | 'deepForest' | 'softSage' | 'midnightStars' | 'oceanDive' | 'warmEarth';
 
 export interface ThemeColors {
   bg: string;
@@ -58,10 +138,16 @@ export interface ThemeColors {
   border: string;
   card: string;
   statusBg: string;
+  tagline?: string;
 }
 
 export const themes: Record<ThemeVariant, ThemeColors> = {
   darkPremium,
   warmLight,
   glassmorphism,
+  deepForest,
+  softSage,
+  midnightStars,
+  oceanDive,
+  warmEarth,
 };

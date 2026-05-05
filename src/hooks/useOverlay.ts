@@ -26,16 +26,22 @@ export function useOverlay() {
     return () => sub.remove();
   }, [checkStatus]);
 
-  const syncData = useCallback(async (colors: ThemeColors, dates: AnchorDate[]) => {
+  const syncData = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], weather?: string) => {
     if (!LockscreenModule?.syncOverlayData) return;
+    console.log('[useOverlay] syncData called with variant:', variant);
     setSyncing(true);
     try {
       const themeJson = JSON.stringify({
+        variant,
         bg: colors.bg,
+        bg1: colors.bg1,
+        bg2: colors.bg2,
         accent: colors.accent,
         text: colors.text,
         text2: colors.text2,
         text3: colors.text3,
+        tagline: colors.tagline || 'BEST YEARS AHEAD',
+        weather: weather || 'WEATHER 22°C (Bhaluka)'
       });
       const datesJson = JSON.stringify(dates);
       await LockscreenModule.syncOverlayData(themeJson, datesJson);
@@ -45,11 +51,11 @@ export function useOverlay() {
     setSyncing(false);
   }, []);
 
-  const start = useCallback(async (colors: ThemeColors, dates: AnchorDate[]) => {
+  const start = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[]) => {
     if (!LockscreenModule) return;
     try {
       // Sync data first
-      await syncData(colors, dates);
+      await syncData(variant, colors, dates);
       // Then start
       await LockscreenModule.startOverlay();
       setActive(true);
@@ -68,11 +74,11 @@ export function useOverlay() {
     }
   }, []);
 
-  const toggle = useCallback(async (colors: ThemeColors, dates: AnchorDate[]) => {
+  const toggle = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[]) => {
     if (active) {
       await stop();
     } else {
-      await start(colors, dates);
+      await start(variant, colors, dates);
     }
   }, [active, start, stop]);
 

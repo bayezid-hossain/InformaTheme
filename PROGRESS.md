@@ -141,3 +141,44 @@
 8. `App.tsx` — Enforces permission checks on startup by redirecting to `OnboardingScreen` step 3 if `overlay` or `fullScreenIntent` is missing, even if onboarded.
 
 **Deviations:** None.
+
+---
+
+## 2026-05-05 — Fix overlay: FSI approach, native Activity, remove MainActivity showWhenLocked
+
+**Plan:** Fix three root-cause bugs in the overlay system: (1) main RN app appearing as lockscreen overlay, (2) overlay going under keyguard / only visible briefly on unlock, (3) overlay only active while main app is in foreground.
+
+**Root causes identified:**
+- `MainActivity` had `android:showWhenLocked="true"` — caused the RN app itself to show over the keyguard when the app was in the foreground.
+- `LockscreenService` used `TYPE_APPLICATION_OVERLAY` WindowManager with `FLAG_SHOW_WHEN_LOCKED`. On Android 12+ (targetSdk 35), this doesn't render above the keyguard. View goes below it. Explains "overlay visible for brief moment when unlocking."
+- `LockscreenActivity` extended `ReactActivity("InformaTheme")` — showed the RN main app instead of the designed overlay UI.
+
+**Steps completed:**
+1. `android-src-staging/LockscreenActivity.kt` — Complete rewrite. Extends `Activity` (not ReactActivity). Builds native overlay UI (clock, date tagline, anchor date cards, quote, swipe-to-unlock). Registers receiver for `ACTION_USER_PRESENT` and `ACTION_DISMISS` broadcast. Clock updates every 30s. Swipe-up calls `finishAndRemoveTask()`. Back blocked.
+2. `android-src-staging/LockscreenService.kt` — Removed WindowManager overlay entirely. `ACTION_SCREEN_OFF` → posts high-priority FSI notification (`CATEGORY_ALARM`, `setFullScreenIntent`) targeting `LockscreenActivity`. `ACTION_USER_PRESENT` → cancels FSI notification + broadcasts `ACTION_DISMISS`. Added `informatheme_fsi` channel (IMPORTANCE_HIGH).
+3. `plugins/withInformaThemeModule.js` — Removed `showWhenLocked`/`turnScreenOn` from `MainActivity`. Added `taskAffinity=""`/`excludeFromRecents="true"` to `LockscreenActivity`.
+
+**Deviations:** None.
+
+---
+
+## 2026-05-05 — Fix POST_NOTIFICATIONS, receiver crash, notifications permission flow
+
+**Plan:** Fix "no overlay shown at all" regression caused by missing POST_NOTIFICATIONS permission and API 33+ registerReceiver crash.
+
+**Root causes identified:**
+- `POST_NOTIFICATIONS` never requested at runtime on Android 13+ → `NotificationManager.notify()` silently drops FSI notification → overlay never fires.
+- `LockscreenActivity.registerDismissReceiver()` called `registerReceiver()` without export flag on API 33+ → `IllegalArgumentException` crash in `onCreate()` → activity never displays.
+- `App.tsx` `missingPermissions` check excluded notifications → users could reach main app without granting notification permission.
+- `LockscreenActivity` used `Theme.Translucent.NoTitleBar.Fullscreen` → keyguard/wallpaper could bleed through before background color painted.
+
+**Steps completed:**
+1. `app.json` — Added `android.permission.POST_NOTIFICATIONS` to permissions array.
+2. `src/hooks/usePermissions.ts` — Added `notifications: boolean` to `PermissionState`. Check via `PermissionsAndroid.check(POST_NOTIFICATIONS)` on API 33+. Added `requestNotifications()` (runtime request with settings fallback) and `openNotificationSettings()`.
+3. `src/screens/onboarding/OnboardingScreen.tsx` — Added Notifications permission card (Android 13+ only). Updated `handleCTA()`, `ctaLabel()`, `allGranted`, and `waiting` type to cover notifications.
+4. `App.tsx` — Added `needsNotifPerm` check; `missingPermissions` now includes `perms.notifications` for Android 13+.
+5. `android-src-staging/LockscreenActivity.kt` — Fixed `registerDismissReceiver()`: uses `RECEIVER_NOT_EXPORTED` on API 33+ (required because `ACTION_DISMISS` is a non-system broadcast).
+6. `android-src-staging/LockscreenService.kt` — Fixed `registerScreenReceiver()`: uses `RECEIVER_EXPORTED` on API 33+ for system broadcast receiver.
+7. `plugins/withInformaThemeModule.js` — Changed `LockscreenActivity` theme from `Theme.Translucent` to `Theme.Black.NoTitleBar.Fullscreen` to prevent keyguard bleed-through.
+
+**Deviations:** None.

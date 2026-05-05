@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { GlassBubble } from './GlassBubble';
 import { ProgressRing } from './ProgressRing';
 import { liveAge, totalDays, daysUntilNextBirthday, progressToNextBirthday, anniversaryProgress } from '../utils/dateCalc';
+import { Star, Heart } from 'lucide-react-native';
 
 interface AnchorDate {
   label: string;
@@ -28,9 +29,13 @@ export function MilestoneBubble({ primary, secondary, accentColor = '#4ade80' }:
       <View className="flex-row items-center gap-3">
         {/* Text content */}
         <View className="flex-1" style={{ gap: 3 }}>
-          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>
-            ✦ Born {days.toLocaleString()} days ago ♡
-          </Text>
+          <View className="flex-row items-center gap-1">
+            <Star size={10} color="rgba(255,255,255,0.65)" />
+            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>
+              Born {days.toLocaleString()} days ago
+            </Text>
+            <Heart size={10} color="rgba(255,255,255,0.65)" />
+          </View>
           <Text style={{ fontSize: 12, color: '#fff', fontWeight: '600' }}>
             <Text style={{ color: accentColor }}>{primary.label.split(' ')[0]}</Text>
             {`'s Live Age: ${age.years}y ${age.months}m ${age.days}d`}

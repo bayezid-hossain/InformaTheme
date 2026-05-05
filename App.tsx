@@ -28,6 +28,7 @@ import { AlertProvider } from './src/hooks/useAlert';
 import { DateStoreProvider } from './src/context/DateStoreContext';
 import { usePermissions } from './src/hooks/usePermissions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 function AppContent() {
   const themeValue = useThemeProvider();
@@ -46,7 +47,9 @@ function AppContent() {
 
   if (onboarded === null || perms.loading) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
-  const missingPermissions = !perms.overlay || !perms.fullScreenIntent;
+  const androidVersion = parseInt(Platform.Version.toString(), 10);
+  const needsNotifPerm = Platform.OS === 'android' && androidVersion >= 33;
+  const missingPermissions = !perms.overlay || !perms.fullScreenIntent || (needsNotifPerm && !perms.notifications);
 
   return (
     <ThemeContext.Provider value={themeValue}>

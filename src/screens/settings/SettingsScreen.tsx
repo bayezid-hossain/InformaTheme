@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TopBar } from '../../components/TopBar';
 import { useTheme } from '../../hooks/useTheme';
 import { usePermissions } from '../../hooks/usePermissions';
+import { User, Cloud, Lock, Smartphone, Battery, Zap, AlertTriangle, Palette, PenTool, Info } from 'lucide-react-native';
 
 export function SettingsScreen() {
   const { colors, variant } = useTheme();
@@ -29,14 +30,14 @@ export function SettingsScreen() {
         <Text className="text-[11px] font-bold tracking-[1.2px] mb-2.5 px-1" style={{ color: colors.text3 }}>ACCOUNT</Text>
         <View className="rounded-2xl border overflow-hidden mb-6" style={{ backgroundColor: colors.bg2, borderColor: colors.border }}>
           <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
-            <Text className="text-lg w-6 text-center">👤</Text>
+            <View className="w-6 items-center"><User size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Profile</Text>
             <Text className="text-[13px]" style={{ color: colors.text3 }}>me.bayezid@gmail.com</Text>
             <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
           </TouchableOpacity>
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
           <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
-            <Text className="text-lg w-6 text-center">☁️</Text>
+            <View className="w-6 items-center"><Cloud size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Cloud Sync</Text>
             <Text className="text-[13px]" style={{ color: colors.text3 }}>Off</Text>
             <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
@@ -50,7 +51,7 @@ export function SettingsScreen() {
             className="flex-row items-center px-4 py-3.5 gap-3"
             onPress={() => { if (!perms.overlay) perms.openOverlaySettings(); }}
           >
-            <Text className="text-lg w-6 text-center">🔒</Text>
+            <View className="w-6 items-center"><Lock size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Display Over Other Apps</Text>
             {perms.loading ? (
               <Text className="text-[13px]" style={{ color: colors.text3 }}>…</Text>
@@ -61,7 +62,7 @@ export function SettingsScreen() {
             className="flex-row items-center px-4 py-3.5 gap-3"
             onPress={() => { if (!perms.fullScreenIntent) perms.openFSISettings(); }}
           >
-            <Text className="text-lg w-6 text-center">📱</Text>
+            <View className="w-6 items-center"><Smartphone size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Full Screen Intent</Text>
             {perms.loading ? (
               <Text className="text-[13px]" style={{ color: colors.text3 }}>…</Text>
@@ -69,14 +70,14 @@ export function SettingsScreen() {
           </TouchableOpacity>
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
           <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
-            <Text className="text-lg w-6 text-center">🔋</Text>
+            <View className="w-6 items-center"><Battery size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Battery Optimization</Text>
             <Text className="text-[13px]" style={{ color: colors.text3 }}>Unrestricted</Text>
             <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
           </TouchableOpacity>
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
           <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
-            <Text className="text-lg w-6 text-center">⚡</Text>
+            <View className="w-6 items-center"><Zap size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Start on Boot</Text>
             <Text className="text-[13px]" style={{ color: colors.text3 }}>Enabled</Text>
             <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
@@ -86,7 +87,7 @@ export function SettingsScreen() {
         {/* Hint when permissions missing */}
         {!perms.loading && (!perms.overlay || !perms.fullScreenIntent) && (
           <View className="flex-row items-start gap-2 rounded-xl px-4 py-3 mb-6 border" style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
-            <Text>⚠️</Text>
+            <AlertTriangle size={18} color="#ef4444" />
             <Text className="flex-1 text-[13px] leading-5" style={{ color: '#ef4444' }}>
               Some permissions are missing. Tap the row to open Settings and grant them. InformaTheme won't display on the lockscreen without them.
             </Text>
@@ -97,21 +98,21 @@ export function SettingsScreen() {
         <Text className="text-[11px] font-bold tracking-[1.2px] mb-2.5 px-1" style={{ color: colors.text3 }}>APP</Text>
         <View className="rounded-2xl border overflow-hidden" style={{ backgroundColor: colors.bg2, borderColor: colors.border }}>
           <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
-            <Text className="text-lg w-6 text-center">🎨</Text>
+            <View className="w-6 items-center"><Palette size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Active Theme</Text>
             <Text className="text-[13px]" style={{ color: colors.text3 }}>{themeLabel}</Text>
             <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
           </TouchableOpacity>
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
           <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
-            <Text className="text-lg w-6 text-center">✏️</Text>
+            <View className="w-6 items-center"><PenTool size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Font Style</Text>
             <Text className="text-[13px]" style={{ color: colors.text3 }}>Space Grotesk</Text>
             <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
           </TouchableOpacity>
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
           <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
-            <Text className="text-lg w-6 text-center">ℹ️</Text>
+            <View className="w-6 items-center"><Info size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>About</Text>
             <Text className="text-[13px]" style={{ color: colors.text3 }}>v1.0.0</Text>
             <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>

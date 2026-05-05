@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 import { useNavigation } from '@react-navigation/native';
+import { ArrowLeft } from 'lucide-react-native';
 
 interface Props {
   title: string;
@@ -21,7 +22,7 @@ export function TopBar({ title, rightElement }: Props) {
       <View className="w-10">
         {canGoBack && (
           <TouchableOpacity onPress={() => navigation.goBack()} className="w-10 h-10 justify-center">
-            <Text className="text-[22px]" style={{ color: colors.text2 }}>←</Text>
+            <ArrowLeft size={22} color={colors.text2} />
           </TouchableOpacity>
         )}
       </View>
