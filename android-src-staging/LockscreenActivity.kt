@@ -94,8 +94,9 @@ class LockscreenActivity : Activity() {
         val tagline     = prefs.getString("tagline", "BEST YEARS AHEAD") ?: "BEST YEARS AHEAD"
         val weather     = prefs.getString("weather", "WEATHER 22°C (Bhaluka)") ?: "WEATHER 22°C (Bhaluka)"
         val datesJson   = prefs.getString("dates", "[]") ?: "[]"
+        val widgetsJson = prefs.getString("widgets", "[\"clock\",\"milestone\",\"anniversary\",\"birthday\",\"weather\"]") ?: "[\"clock\",\"milestone\",\"anniversary\",\"birthday\",\"weather\"]"
         setContentView(buildOverlayView(variant, bgColor, bg1Color, bg2Color,
-            textColor, text2Color, text3Color, accentColor, tagline, weather, datesJson))
+            textColor, text2Color, text3Color, accentColor, tagline, weather, datesJson, widgetsJson))
         updateBatteryUI()
     }
 
@@ -255,12 +256,19 @@ class LockscreenActivity : Activity() {
 
     // ── Main UI builder ───────────────────────────────────────────────────────
 
-    @Suppress("DEPRECATION")
     private fun buildOverlayView(
         variant: String, bgColor: Int, bg1Color: Int, bg2Color: Int,
         textColor: Int, text2Color: Int, text3Color: Int,
-        accentColor: Int, tagline: String, weather: String, datesJson: String
+        accentColor: Int, tagline: String, weather: String, datesJson: String, widgetsJson: String
     ): View {
+        val enabledWidgets = mutableSetOf<String>()
+        try {
+            val arr = JSONArray(widgetsJson)
+            for (i in 0 until arr.length()) enabledWidgets.add(arr.getString(i))
+        } catch (_: Exception) {
+            enabledWidgets.addAll(listOf("clock", "milestone", "anniversary", "birthday", "weather"))
+        }
+
         val ctx = this
         val MP  = ViewGroup.LayoutParams.MATCH_PARENT
         val WC  = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -289,29 +297,32 @@ class LockscreenActivity : Activity() {
         }
 
         // Battery
-        content.addView(LinearLayout(ctx).apply {
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(10) }
-            addView(buildBatteryWidget(ctx, accentColor))
-        })
+        if (enabledWidgets.contains("battery")) {
+            content.addView(LinearLayout(ctx).apply {
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(10) }
+                addView(buildBatteryWidget(ctx, accentColor))
+            })
+        }
 
-        // Tagline
-        val dateFmt = SimpleDateFormat("EEE MM-dd", Locale.getDefault())
-        content.addView(TextView(ctx).apply {
-            text = "${dateFmt.format(Date()).uppercase()} ▼ $tagline ▼"
-            setTextColor(textColor); textSize = 10f; letterSpacing = 0.15f
-            gravity = Gravity.CENTER; setTypeface(typeface, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(2) }
-        })
+        // Tagline & Clock
+        if (enabledWidgets.contains("clock")) {
+            val dateFmt = SimpleDateFormat("EEE MM-dd", Locale.getDefault())
+            content.addView(TextView(ctx).apply {
+                text = "${dateFmt.format(Date()).uppercase()} ▼ $tagline ▼"
+                setTextColor(textColor); textSize = 10f; letterSpacing = 0.15f
+                gravity = Gravity.CENTER; setTypeface(typeface, Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(2) }
+            })
 
-        // Clock
-        content.addView(TextView(ctx).apply {
-            text = timeFormat.format(Date())
-            setTextColor(textColor); textSize = 80f
-            typeface = Typeface.create("sans-serif-condensed-light", Typeface.NORMAL)
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(20) }
-        }.also { clockTextView = it })
+            content.addView(TextView(ctx).apply {
+                text = timeFormat.format(Date())
+                setTextColor(textColor); textSize = 80f
+                typeface = Typeface.create("sans-serif-condensed-light", Typeface.NORMAL)
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(20) }
+            }.also { clockTextView = it })
+        }
 
         // Date carousels
         val dates         = parseDatesJson(datesJson)
@@ -319,24 +330,29 @@ class LockscreenActivity : Activity() {
         val anniversaries = dates.filter { it.type == "anniversary" }
         val milestones    = dates.filter { it.type == "milestone" }
 
-        if (birthdays.isNotEmpty())
+        if (enabledWidgets.contains("birthday") && birthdays.isNotEmpty())
             content.addView(buildCarousel(
                 birthdays.map { buildBirthdayCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color) }
             ))
 
-        if (anniversaries.isNotEmpty())
+        if (enabledWidgets.contains("anniversary") && anniversaries.isNotEmpty())
             content.addView(buildCarousel(
                 anniversaries.map { buildAnniversaryCard(ctx, it, accentColor, bg1Color, textColor, text3Color) },
                 narrow = true
             ))
 
-        if (milestones.isNotEmpty())
+        if (enabledWidgets.contains("milestone") && milestones.isNotEmpty())
             content.addView(buildCarousel(
                 milestones.map { buildMilestoneCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color) }
             ))
 
         // Upcoming chips ≤30 days
-        val upcoming = dates.filter { it.type != "milestone" && it.daysUntilNext != null && it.daysUntilNext!! <= 30 }
+        val upcoming = dates.filter {
+            it.daysUntilNext != null && it.daysUntilNext!! <= 30 && (
+                (it.type == "birthday" && enabledWidgets.contains("birthday")) ||
+                (it.type == "anniversary" && enabledWidgets.contains("anniversary"))
+            )
+        }
         if (upcoming.isNotEmpty()) {
             val col = LinearLayout(ctx).apply {
                 orientation = LinearLayout.VERTICAL
@@ -378,7 +394,7 @@ class LockscreenActivity : Activity() {
         pillsCol.addView(buildPill(ctx, todayStr, textColor).apply {
             (layoutParams as LinearLayout.LayoutParams).bottomMargin = dp(8)
         })
-        if (weather.isNotEmpty()) pillsCol.addView(buildPill(ctx, weather, textColor))
+        if (enabledWidgets.contains("weather") && weather.isNotEmpty()) pillsCol.addView(buildPill(ctx, weather, textColor))
         content.addView(pillsCol)
 
         // Unlock slider

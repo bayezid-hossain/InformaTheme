@@ -71,6 +71,7 @@ class LockscreenModule(private val reactContext: ReactApplicationContext) :
                 .putString("text3", theme.optString("text3", "#4a5568"))
                 .putString("tagline", theme.optString("tagline", "BEST YEARS AHEAD"))
                 .putString("weather", theme.optString("weather", ""))
+                .putString("widgets", theme.optJSONArray("widgets")?.toString() ?: "[\"clock\",\"milestone\",\"anniversary\",\"birthday\",\"weather\"]")
                 .putString("dates", datesJson)
                 .apply()
 

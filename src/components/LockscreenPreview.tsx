@@ -15,6 +15,7 @@ import { ProgressRing } from './ProgressRing';
 import { liveAge, nextEventCountdown, totalDays } from '../utils/dateCalc';
 
 import { useBattery } from '../hooks/useBattery';
+import { useWidgetStore } from '../hooks/useWidgetStore';
 
 const { width } = Dimensions.get('window');
 const PHONE_W = width - 64;
@@ -96,6 +97,13 @@ export function LockscreenPreview() {
   const { colors, variant } = useTheme();
   const { weather: weatherData } = useWeather();
   const { dates } = useDateStore();
+  const { widgets } = useWidgetStore();
+
+  const isEnabled = (id: string) => {
+    const w = widgets.find(x => x.id === id);
+    return w ? w.enabled : true;
+  };
+
   const tagline = colors.tagline || 'BEST YEARS AHEAD';
   const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'short', month: '2-digit', day: '2-digit' }).replace(',', '').toUpperCase();
   const taglineText = `${todayDate} ▼ ${tagline} ▼`;
@@ -131,22 +139,28 @@ export function LockscreenPreview() {
 
         <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 24 }}>
           {/* Battery */}
-          <View style={{ alignItems: 'center', marginBottom: 12 }}>
-            <BatteryWidget color={colors.accent} />
-          </View>
+          {isEnabled('battery') && (
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <BatteryWidget color={colors.accent} />
+            </View>
+          )}
 
           {/* Date tagline */}
-          <Text className="text-center" style={{ fontSize: 10, color: colors.text, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>
-            {taglineText}
-          </Text>
+          {isEnabled('clock') && (
+            <Text className="text-center" style={{ fontSize: 10, color: colors.text, fontWeight: '700', letterSpacing: 1, marginBottom: 4 }}>
+              {taglineText}
+            </Text>
+          )}
 
           {/* Clock */}
-          <View className="items-center" style={{ marginBottom: 16 }}>
-            <Clock style="stencil" color={colors.text} size={80} />
-          </View>
+          {isEnabled('clock') && (
+            <View className="items-center" style={{ marginBottom: 16 }}>
+              <Clock style="stencil" color={colors.text} size={80} />
+            </View>
+          )}
 
           {/* Birthdays Slider */}
-          {birthdays.length > 0 && (
+          {isEnabled('birthday') && birthdays.length > 0 && (
             <HorizontalSlider>
               {birthdays.map(d => (
                 <MilestoneBubble 
@@ -159,7 +173,7 @@ export function LockscreenPreview() {
           )}
 
           {/* Anniversaries Slider */}
-          {anniversaries.length > 0 && (
+          {isEnabled('anniversary') && anniversaries.length > 0 && (
             <HorizontalSlider>
               {anniversaries.map(d => (
                 <AnniversaryCard 
@@ -175,7 +189,7 @@ export function LockscreenPreview() {
           )}
 
           {/* Milestones Slider */}
-          {milestones.length > 0 && (
+          {isEnabled('milestone') && milestones.length > 0 && (
             <HorizontalSlider>
               {milestones.map(d => (
                 <MilestoneCard 
@@ -192,7 +206,10 @@ export function LockscreenPreview() {
           )}
 
           {/* Event pill (Quick highlights for soonest events) */}
-          {dates.some(d => d.type !== 'milestone') && (
+          {dates.some(d => 
+            (d.type === 'birthday' && isEnabled('birthday')) ||
+            (d.type === 'anniversary' && isEnabled('anniversary'))
+          ) && (
             <GlassBubble pill style={{ alignSelf: 'flex-start', marginTop: 12, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={{ fontSize: 12, color: colors.text, fontWeight: '700' }}>Next Event Coming Soon</Text>
@@ -214,9 +231,11 @@ export function LockscreenPreview() {
               <Text style={{ fontSize: 10, color: colors.text, fontWeight: '700' }}>TODAY, {new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()}</Text>
             </View>
           </View>
-          <View style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 24 }}>
-            <Text style={{ fontSize: 10, color: colors.text, fontWeight: '700' }}>WEATHER {weatherData.temp}°C ({weatherData.location})</Text>
-          </View>
+          {isEnabled('weather') && (
+            <View style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 24 }}>
+              <Text style={{ fontSize: 10, color: colors.text, fontWeight: '700' }}>WEATHER {weatherData.temp}°C ({weatherData.location})</Text>
+            </View>
+          )}
 
           {/* Unlock Slider */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>

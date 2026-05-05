@@ -10,6 +10,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useDates } from '../context/DateStoreContext';
 import { useOverlay } from '../hooks/useOverlay';
 import { useWeather } from '../hooks/useWeather';
+import { useWidgetStore } from '../hooks/useWidgetStore';
 
 const Stack = createNativeStackNavigator();
 
@@ -18,13 +19,17 @@ export function AppNavigator() {
   const { dates } = useDates();
   const { weather } = useWeather();
   const overlay = useOverlay();
-
+  const { widgets } = useWidgetStore();
+ 
   const weatherStr = `WEATHER ${weather.temp}°C (${weather.location})`;
-
-  // Sync data globally whenever theme, dates, or weather change
+  const enabledWidgetIdsStr = React.useMemo(() => {
+    return widgets.filter(w => w.enabled).map(w => w.id).join(',');
+  }, [widgets]);
+ 
+  // Sync data globally whenever theme, dates, weather, or widgets change
   React.useEffect(() => {
-    overlay.syncData(variant, colors, dates, weatherStr);
-  }, [variant, colors, dates, weatherStr, overlay.syncData]);
+    overlay.syncData(variant, colors, dates, weatherStr, enabledWidgetIdsStr.split(','));
+  }, [variant, colors, dates, weatherStr, enabledWidgetIdsStr, overlay.syncData]);
 
   return (
     <Stack.Navigator

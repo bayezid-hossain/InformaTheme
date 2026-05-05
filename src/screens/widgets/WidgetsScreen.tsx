@@ -4,13 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TopBar } from '../../components/TopBar';
 import { useTheme } from '../../hooks/useTheme';
 import { useWidgetStore } from '../../hooks/useWidgetStore';
-import { Clock, Calendar, Heart, Sprout, Cloud, Battery, Target, Hourglass } from 'lucide-react-native';
+import { Clock, Calendar, Heart, Sprout, Cloud, Battery, Target, Hourglass, Cake } from 'lucide-react-native';
 
 function getWidgetIcon(id: string, color: string) {
   switch (id) {
     case 'clock': return <Clock size={28} color={color} />;
     case 'milestone': return <Calendar size={28} color={color} />;
     case 'anniversary': return <Heart size={28} color={color} />;
+    case 'birthday': return <Cake size={28} color={color} />;
     case 'growth': return <Sprout size={28} color={color} />;
     case 'weather': return <Cloud size={28} color={color} />;
     case 'battery': return <Battery size={28} color={color} />;

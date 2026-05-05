@@ -13,7 +13,16 @@ export function SettingsScreen() {
   const perms = usePermissions();
   const { refresh: refreshWeather } = useWeather();
   const [locationGranted, setLocationGranted] = React.useState<boolean>(false);
-  const themeLabel = variant === 'darkPremium' ? 'Dark Premium' : variant === 'warmLight' ? 'Warm Light' : 'Glassmorphism';
+  const themeLabel = {
+    darkPremium: 'Dark Premium',
+    warmLight: 'Warm Light',
+    glassmorphism: 'Glassmorphism',
+    deepForest: 'Deep Forest',
+    softSage: 'Soft Sage',
+    midnightStars: 'Midnight Stars',
+    oceanDive: 'Ocean Dive',
+    warmEarth: 'Warm Earth'
+  }[variant] || 'Dark Premium';
 
   React.useEffect(() => {
     Location.getForegroundPermissionsAsync().then(({ status }) => {

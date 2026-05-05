@@ -41,12 +41,43 @@ function daysUntilNext(dateISO: string, type: string): number | null {
   const next = thisYear <= now ? addYears(thisYear, 1) : thisYear;
   return differenceInDays(next, now);
 }
+ 
+function getCountdownBreakdown(dateISO: string, type: string) {
+  if (type === 'milestone') return null;
+  const origin = new Date(dateISO);
+  const now = new Date();
+  
+  // Normalize both dates to midnight to prevent timezone or mid-day calculation mismatches
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const next = new Date(nowMidnight.getFullYear(), origin.getMonth(), origin.getDate());
+  if (next <= nowMidnight) {
+    next.setFullYear(nowMidnight.getFullYear() + 1);
+  }
+  
+  const totalDays = differenceInDays(next, nowMidnight);
+  
+  let nextMonths = next.getMonth() - nowMidnight.getMonth();
+  let nextDays = next.getDate() - nowMidnight.getDate();
+  
+  if (nextDays < 0) {
+    nextMonths--;
+    const prevMonthDate = new Date(next.getFullYear(), next.getMonth(), 0);
+    nextDays += prevMonthDate.getDate();
+  }
+  if (nextMonths < 0) {
+    nextMonths += 12;
+  }
+  
+  return { months: nextMonths, days: nextDays, totalDays };
+}
 
 function liveAgeShort(dateISO: string) {
-  const date = new Date(dateISO);
-  const now = new Date();
-  const days = differenceInDays(now, date);
-  return `${days} days ago`;
+  try {
+    const date = new Date(dateISO);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch (_: any) {
+    return dateISO;
+  }
 }
 
 export function HomeScreen() {
@@ -173,7 +204,7 @@ export function HomeScreen() {
             <>
               {previewDates.map((d) => {
                 const typeColor = TYPE_COLOR[d.type] ?? colors.accent;
-                const daysLeft = daysUntilNext(d.dateISO, d.type);
+                const countdown = getCountdownBreakdown(d.dateISO, d.type);
                 return (
                   <View
                     key={d.id}
@@ -194,14 +225,14 @@ export function HomeScreen() {
                         {liveAgeShort(d.dateISO)}
                       </Text>
                     </View>
-                    {/* Days left */}
-                    {daysLeft !== null && (
-                      <View className="items-end">
-                        <Text className="text-[22px] font-extrabold leading-none" style={{ color: typeColor }}>
-                          {daysLeft}
+                    {/* Days left breakdown */}
+                    {countdown !== null && (
+                      <View className="items-end justify-center">
+                        <Text className="text-[20px] font-extrabold leading-none" style={{ color: typeColor }}>
+                          {countdown.totalDays}d
                         </Text>
-                        <Text className="text-[9px] font-bold tracking-wider mt-0.5" style={{ color: colors.text3 }}>
-                          DAYS LEFT
+                        <Text className="text-[10px] font-bold mt-1" style={{ color: colors.text2 }}>
+                          {countdown.months > 0 ? `${countdown.months}m ` : ''}{countdown.days}d left
                         </Text>
                       </View>
                     )}

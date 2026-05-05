@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { NativeModules, AppState } from 'react-native';
-import { AnchorDate } from './useDateStore';
+import { useCallback, useEffect, useState } from 'react';
+import { AppState, NativeModules } from 'react-native';
 import { ThemeColors } from '../theme/colors';
+import { AnchorDate } from './useDateStore';
 
 const { LockscreenModule } = NativeModules;
 
@@ -26,7 +26,7 @@ export function useOverlay() {
     return () => sub.remove();
   }, [checkStatus]);
 
-  const syncData = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], weather?: string) => {
+  const syncData = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], weather?: string, widgets?: string[]) => {
     if (!LockscreenModule?.syncOverlayData) return;
     console.log('[useOverlay] syncData called with variant:', variant);
     setSyncing(true);
@@ -41,7 +41,8 @@ export function useOverlay() {
         text2: colors.text2,
         text3: colors.text3,
         tagline: colors.tagline || 'BEST YEARS AHEAD',
-        weather: weather || 'WEATHER 22°C (Bhaluka)'
+        weather: weather || 'WEATHER 22°C (Bhaluka)',
+        widgets: widgets || ['clock', 'milestone', 'anniversary', 'birthday', 'weather']
       });
       const datesJson = JSON.stringify(dates);
       await LockscreenModule.syncOverlayData(themeJson, datesJson);
