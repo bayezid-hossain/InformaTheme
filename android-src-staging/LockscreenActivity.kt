@@ -31,6 +31,7 @@ class LockscreenActivity : Activity() {
     }
 
     private var clockTextView: TextView? = null
+    private var bottomChargingIconView: TextView? = null
     private val handler = Handler(Looper.getMainLooper())
     private val timeFormat = SimpleDateFormat("hh:mm", Locale.getDefault())
     private var dismissReceiver: BroadcastReceiver? = null
@@ -39,15 +40,9 @@ class LockscreenActivity : Activity() {
 
     private var batteryLevel: Int = 100
     private var isCharging: Boolean = false
-    private var batteryFillView: View? = null
-    private var batteryText: TextView? = null
-
-    private val dimHandler = Handler(Looper.getMainLooper())
-    private val dimRunnable = Runnable {
-        val lp = window.attributes
-        lp.screenBrightness = 0.02f
-        window.attributes = lp
-    }
+    private val batteryFillViews = mutableListOf<View>()
+    private val batteryTexts = mutableListOf<TextView>()
+    private val batteryPillViews = mutableListOf<TextView>()
 
     private val clockUpdater = object : Runnable {
         override fun run() {
@@ -75,25 +70,10 @@ class LockscreenActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        scheduleDim()
     }
 
     override fun onPause() {
         super.onPause()
-        dimHandler.removeCallbacks(dimRunnable)
-    }
-
-    private fun scheduleDim() {
-        dimHandler.removeCallbacks(dimRunnable)
-        dimHandler.postDelayed(dimRunnable, DIM_DELAY)
-    }
-
-    private fun undim() {
-        dimHandler.removeCallbacks(dimRunnable)
-        val lp = window.attributes
-        lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-        window.attributes = lp
-        scheduleDim()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -112,7 +92,7 @@ class LockscreenActivity : Activity() {
         val text2Color  = parseColor(prefs.getString("text2",  "#8892a4"), "#8892a4")
         val text3Color  = parseColor(prefs.getString("text3",  "#4a5568"), "#4a5568")
         val tagline     = prefs.getString("tagline", "BEST YEARS AHEAD") ?: "BEST YEARS AHEAD"
-        val weather     = prefs.getString("weather", "") ?: ""
+        val weather     = prefs.getString("weather", "WEATHER 22°C (Bhaluka)") ?: "WEATHER 22°C (Bhaluka)"
         val datesJson   = prefs.getString("dates", "[]") ?: "[]"
         setContentView(buildOverlayView(variant, bgColor, bg1Color, bg2Color,
             textColor, text2Color, text3Color, accentColor, tagline, weather, datesJson))
@@ -168,12 +148,16 @@ class LockscreenActivity : Activity() {
     }
 
     private fun updateBatteryUI() {
-        batteryFillView?.let {
-            val lp = it.layoutParams as FrameLayout.LayoutParams
+        val batteryStr = "$batteryLevel%${if (isCharging) " ⚡" else ""}"
+        batteryTexts.forEach { it.text = batteryStr }
+        val batteryPillStr = "BATTERY $batteryLevel%${if (isCharging) " ⚡" else ""}"
+        batteryPillViews.forEach { it.text = batteryPillStr }
+        bottomChargingIconView?.text = if (isCharging) "⚡" else ""
+        batteryFillViews.forEach { fill ->
+            val lp = fill.layoutParams as FrameLayout.LayoutParams
             lp.width = (batteryLevel * (dp(45) - dp(4)) / 100)
-            it.layoutParams = lp
+            fill.layoutParams = lp
         }
-        batteryText?.text = "$batteryLevel%${if (isCharging) " ⚡" else ""}"
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
@@ -183,8 +167,11 @@ class LockscreenActivity : Activity() {
 
     override fun onDestroy() {
         handler.removeCallbacks(clockUpdater)
-        dimHandler.removeCallbacks(dimRunnable)
-        clockTextView = null; batteryFillView = null; batteryText = null
+        clockTextView = null
+        bottomChargingIconView = null
+        batteryFillViews.clear()
+        batteryTexts.clear()
+        batteryPillViews.clear()
         try { unregisterReceiver(dismissReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(dataReceiver) }    catch (_: Exception) {}
         try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
@@ -196,7 +183,8 @@ class LockscreenActivity : Activity() {
     data class DateEntry(
         val label: String, val type: String, val icon: String,
         val daysSince: Long, val years: Int, val months: Int,
-        val daysRemainder: Int, val daysUntilNext: Int?
+        val daysRemainder: Int, val daysUntilNext: Int?,
+        val nextMonths: Int, val nextDays: Int, val originalDateStr: String
     )
 
     private fun parseDatesJson(json: String): List<DateEntry> {
@@ -223,13 +211,19 @@ class LockscreenActivity : Activity() {
                 val daysSince = TimeUnit.MILLISECONDS.toDays(now.timeInMillis - cal.timeInMillis)
                 var years     = now.get(Calendar.YEAR)  - cal.get(Calendar.YEAR)
                 var months    = now.get(Calendar.MONTH) - cal.get(Calendar.MONTH)
-                if (months < 0) { years--; months += 12 }
-                val afterMonths = (cal.clone() as Calendar).apply {
-                    add(Calendar.YEAR, years); add(Calendar.MONTH, months)
+                var daysRemainder = now.get(Calendar.DAY_OF_MONTH) - cal.get(Calendar.DAY_OF_MONTH)
+                if (daysRemainder < 0) {
+                    months--
+                    val prevMonth = (now.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
+                    daysRemainder += prevMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
                 }
-                val daysRemainder = TimeUnit.MILLISECONDS.toDays(
-                    now.timeInMillis - afterMonths.timeInMillis).toInt().coerceAtLeast(0)
+                if (months < 0) {
+                    years--
+                    months += 12
+                }
 
+                var nextMonths = 0
+                var nextDays = 0
                 val daysUntilNext: Int? = if (type != "milestone") {
                     val next = Calendar.getInstance().apply {
                         set(Calendar.MONTH, cal.get(Calendar.MONTH))
@@ -238,10 +232,22 @@ class LockscreenActivity : Activity() {
                         set(Calendar.SECOND, 0);      set(Calendar.MILLISECOND, 0)
                     }
                     if (!next.after(now)) next.add(Calendar.YEAR, 1)
+                    
+                    // Calculate months and days for next event
+                    nextMonths = next.get(Calendar.MONTH) - now.get(Calendar.MONTH)
+                    nextDays = next.get(Calendar.DAY_OF_MONTH) - now.get(Calendar.DAY_OF_MONTH)
+                    if (nextDays < 0) {
+                        nextMonths--
+                        val prevMonth = (next.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
+                        nextDays += prevMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
+                    }
+                    if (nextMonths < 0) nextMonths += 12
+                    
                     TimeUnit.MILLISECONDS.toDays(next.timeInMillis - now.timeInMillis).toInt()
                 } else null
 
-                result.add(DateEntry(label, type, icon, daysSince, years, months, daysRemainder, daysUntilNext))
+                val originalDateStr = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(cal.time)
+                result.add(DateEntry(label, type, icon, daysSince, years, months, daysRemainder, daysUntilNext, nextMonths, nextDays, originalDateStr))
             }
         } catch (e: Exception) { Log.e("LockscreenActivity", "parseDatesJson: ${e.message}") }
         return result
@@ -264,6 +270,10 @@ class LockscreenActivity : Activity() {
                 intArrayOf(bgColor, bg1Color, bg2Color))
             isClickable = true; isFocusable = true
         }
+
+        batteryTexts.clear()
+        batteryFillViews.clear()
+        batteryPillViews.clear()
 
         addBackgroundShapes(ctx, root, variant, resources.displayMetrics.density)
 
@@ -363,8 +373,9 @@ class LockscreenActivity : Activity() {
                 bottomMargin = dp(16); marginStart = dp(20); marginEnd = dp(20)
             }
         }
-        val hour = SimpleDateFormat("H", Locale.getDefault()).format(Date())
-        pillsCol.addView(buildPill(ctx, "TODAY  ${hour}h", textColor).apply {
+        val dayOfWeek = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date()).uppercase()
+        val todayStr = "TODAY, $dayOfWeek"
+        pillsCol.addView(buildPill(ctx, todayStr, textColor).apply {
             (layoutParams as LinearLayout.LayoutParams).bottomMargin = dp(8)
         })
         if (weather.isNotEmpty()) pillsCol.addView(buildPill(ctx, weather, textColor))
@@ -381,12 +392,12 @@ class LockscreenActivity : Activity() {
         scroll.addView(content)
         root.addView(scroll)
 
-        // Touch: undim + swipe-up dismiss
+        // Touch: swipe-up dismiss
         scroll.setOnTouchListener(object : View.OnTouchListener {
             private var startY = 0f; private var startTime = 0L
             override fun onTouch(v: View, e: MotionEvent): Boolean {
                 when (e.action) {
-                    MotionEvent.ACTION_DOWN -> { startY = e.rawY; startTime = System.currentTimeMillis(); undim() }
+                    MotionEvent.ACTION_DOWN -> { startY = e.rawY; startTime = System.currentTimeMillis() }
                     MotionEvent.ACTION_UP -> {
                         val dy = startY - e.rawY
                         val dt = System.currentTimeMillis() - startTime
@@ -396,7 +407,6 @@ class LockscreenActivity : Activity() {
                 return false
             }
         })
-        root.setOnTouchListener { _, e -> if (e.action == MotionEvent.ACTION_DOWN) undim(); false }
 
         return root
     }
@@ -416,12 +426,17 @@ class LockscreenActivity : Activity() {
             screenW - sidePad * 2 - dp(24) // 24dp peek of next card
         }
 
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(16) }
+        }
+
         val hScroll = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             clipToPadding = false
             setPadding(sidePad, 0, sidePad, 0)
             overScrollMode = View.OVER_SCROLL_NEVER
-            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(16) }
+            layoutParams = LinearLayout.LayoutParams(MP, WC)
         }
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -434,7 +449,58 @@ class LockscreenActivity : Activity() {
             row.addView(card)
         }
         hScroll.addView(row)
-        return hScroll
+        container.addView(hScroll)
+
+        // Dynamic Dots Indicator
+        if (cards.size > 1) {
+            val dotsRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { topMargin = dp(8) }
+            }
+            val dots = mutableListOf<View>()
+            val dotActiveW = dp(14)
+            val dotInactiveW = dp(6)
+            val dotH = dp(6)
+
+            fun updateDots(activeIndex: Int) {
+                dots.forEachIndexed { idx, dot ->
+                    val lp = dot.layoutParams as LinearLayout.LayoutParams
+                    lp.width = if (idx == activeIndex) dotActiveW else dotInactiveW
+                    dot.layoutParams = lp
+                    dot.background = GradientDrawable().apply {
+                        setColor(if (idx == activeIndex) Color.WHITE else Color.argb(100, 255, 255, 255))
+                        cornerRadius = dp(3).toFloat()
+                    }
+                }
+            }
+
+            cards.forEachIndexed { i, _ ->
+                val dot = View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(dotInactiveW, dotH).apply {
+                        if (i < cards.size - 1) marginEnd = dp(6)
+                    }
+                    background = GradientDrawable().apply {
+                        setColor(Color.argb(100, 255, 255, 255))
+                        cornerRadius = dp(3).toFloat()
+                    }
+                }
+                dots.add(dot)
+                dotsRow.addView(dot)
+            }
+            updateDots(0)
+            container.addView(dotsRow)
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                hScroll.setOnScrollChangeListener { _, scrollX, _, _, _ ->
+                    val index = Math.round(scrollX.toFloat() / (cardW + gap).toFloat())
+                    val clamped = index.coerceIn(0, cards.size - 1)
+                    updateDots(clamped)
+                }
+            }
+        }
+
+        return container
     }
 
     private fun cardBackground(bg1Color: Int): GradientDrawable = GradientDrawable().apply {
@@ -456,8 +522,8 @@ class LockscreenActivity : Activity() {
             background = cardBackground(bg1Color)
 
             addView(TextView(ctx).apply {
-                text = "• Born ${"%,d".format(bd.daysSince)} days ago ${bd.icon}"
-                setTextColor(accentColor); textSize = 11f; letterSpacing = 0.05f
+                text = "• Born ${bd.originalDateStr} (${"%,d".format(bd.daysSince)} days ago) ${bd.icon}"
+                setTextColor(accentColor); textSize = 10.5f; letterSpacing = 0.03f
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(6) }
             })
             addView(TextView(ctx).apply {
@@ -467,8 +533,7 @@ class LockscreenActivity : Activity() {
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
             })
             addView(TextView(ctx).apply {
-                text = "${bd.label.split(" ").firstOrNull() ?: bd.label}'s Live Age: " +
-                       "${bd.years} Years, ${bd.months} Months, ${bd.daysRemainder} Days"
+                text = "Age: ${bd.years}y ${bd.months}m ${bd.daysRemainder}d"
                 setTextColor(text2Color); textSize = 12f
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(8) }
             })
@@ -479,7 +544,8 @@ class LockscreenActivity : Activity() {
             })
             bd.daysUntilNext?.let { until ->
                 addView(TextView(ctx).apply {
-                    text = "Next Birthday: $until Days"
+                    val labelPrefix = if (bd.type == "birthday") "Next Birthday" else "Next Event"
+                    text = "$labelPrefix: ${bd.nextMonths}m ${bd.nextDays}d ($until Days)"
                     setTextColor(text3Color); textSize = 11f; letterSpacing = 0.05f
                     layoutParams = LinearLayout.LayoutParams(MP, WC)
                 })
@@ -513,7 +579,12 @@ class LockscreenActivity : Activity() {
                     setBackgroundColor(Color.argb(20, 255, 255, 255))
                 })
                 addView(TextView(ctx).apply {
-                    text = "Next: $until d"
+                    text = "Since: ${ann.originalDateStr}"
+                    setTextColor(text3Color); textSize = 8.5f; gravity = Gravity.CENTER
+                    layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(2) }
+                })
+                addView(TextView(ctx).apply {
+                    text = "Next: ${ann.nextMonths}m ${ann.nextDays}d"
                     setTextColor(text3Color); textSize = 9f; gravity = Gravity.CENTER
                     layoutParams = LinearLayout.LayoutParams(MP, WC)
                 })
@@ -536,7 +607,7 @@ class LockscreenActivity : Activity() {
             background = cardBackground(bg1Color)
 
             addView(TextView(ctx).apply {
-                text = "${ms.label}:"
+                text = "${ms.label} (${ms.originalDateStr}):"
                 setTextColor(text2Color); textSize = 11f; letterSpacing = 0.05f
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
             })
@@ -630,9 +701,11 @@ class LockscreenActivity : Activity() {
                 layoutParams = LinearLayout.LayoutParams(dp(80), dp(36)).apply { marginStart = dp(8) }
                 background = GradientDrawable().apply { setColor(accentColor); cornerRadius = dp(8).toFloat() }
                 addView(TextView(ctx).apply {
-                    text = "⚡"; gravity = Gravity.CENTER; textSize = 18f
+                    text = if (isCharging) "⚡" else ""
+                    gravity = Gravity.CENTER; textSize = 18f
                     layoutParams = FrameLayout.LayoutParams(
                         FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                    bottomChargingIconView = this
                 })
             })
             addView(View(ctx).apply {
@@ -658,12 +731,13 @@ class LockscreenActivity : Activity() {
     private fun buildBatteryWidget(ctx: Context, accentColor: Int): View {
         val WC = ViewGroup.LayoutParams.WRAP_CONTENT
         return LinearLayout(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(WC, WC)
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             addView(TextView(ctx).apply {
                 text = "$batteryLevel%${if (isCharging) " ⚡" else ""}"
                 setTextColor(Color.WHITE); textSize = 10f; setTypeface(typeface, Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(WC, WC).apply { marginEnd = dp(8) }
-            }.also { batteryText = it })
+            }.also { batteryTexts.add(it) })
             addView(View(ctx).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(20), dp(2))
                 setBackgroundColor(Color.argb(120, 255, 255, 255))
@@ -680,7 +754,7 @@ class LockscreenActivity : Activity() {
                 ).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL; marginStart = dp(2) }
                 background = GradientDrawable().apply { setColor(accentColor); cornerRadius = dp(2).toFloat() }
             }
-            batteryFillView = fill
+            batteryFillViews.add(fill)
             body.addView(fill); addView(body)
             addView(View(ctx).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(3), dp(8))

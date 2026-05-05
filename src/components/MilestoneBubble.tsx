@@ -1,9 +1,9 @@
+import { Heart, Star } from 'lucide-react-native';
 import React from 'react';
-import { View, Text } from 'react-native';
+import { Text, View } from 'react-native';
+import { anniversaryProgress, liveAge, nextEventCountdown, progressToNextBirthday, totalDays } from '../utils/dateCalc';
 import { GlassBubble } from './GlassBubble';
 import { ProgressRing } from './ProgressRing';
-import { liveAge, totalDays, daysUntilNextBirthday, progressToNextBirthday, anniversaryProgress } from '../utils/dateCalc';
-import { Star, Heart } from 'lucide-react-native';
 
 interface AnchorDate {
   label: string;
@@ -20,55 +20,36 @@ interface Props {
 export function MilestoneBubble({ primary, secondary, accentColor = '#4ade80' }: Props) {
   const age = liveAge(primary.date);
   const days = totalDays(primary.date);
-  const nextBday = daysUntilNextBirthday(primary.date);
-  const bProg = progressToNextBirthday(primary.date);
-  const aProg = secondary ? anniversaryProgress(secondary.date) : anniversaryProgress(primary.date);
+  const next = nextEventCountdown(primary.date);
 
   return (
-    <GlassBubble style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
-      <View className="flex-row items-center gap-3">
-        {/* Text content */}
-        <View className="flex-1" style={{ gap: 3 }}>
-          <View className="flex-row items-center gap-1">
-            <Star size={10} color="rgba(255,255,255,0.65)" />
-            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>
-              Born {days.toLocaleString()} days ago
-            </Text>
-            <Heart size={10} color="rgba(255,255,255,0.65)" />
-          </View>
-          <Text style={{ fontSize: 13, color: '#fff', fontWeight: '800' }}>
-            <Text style={{ color: accentColor }}>{primary.label.split(' ')[0]}</Text>
-            {primary.type === 'birthday' ? `'s Live Age: ` : `'s Time: `}
-            <Text style={{ fontSize: 14 }}>{`${age.years}y ${age.months}m ${age.days}d`}</Text>
+    <GlassBubble style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+      <View style={{ gap: 4 }}>
+        {/* Born days ago header */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Star size={10} color={accentColor} />
+          <Text style={{ fontSize: 10, color: accentColor, fontWeight: '700', letterSpacing: 0.3 }}>
+            BORN {primary.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()} ({days.toLocaleString().toUpperCase()} DAYS AGO)
           </Text>
-          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '600' }}>
-            Next {primary.type === 'birthday' ? 'Birthday' : 'Event'}: {nextBday} days
-          </Text>
-          {/* Progress bar */}
-          <View className="h-0.5 rounded-full overflow-hidden mt-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
-            <View style={{ width: `${bProg * 100}%`, height: 2, backgroundColor: accentColor, opacity: 0.7, borderRadius: 999 }} />
-          </View>
         </View>
 
-        {/* Rings */}
-        <View className="flex-row" style={{ gap: 10 }}>
-          <ProgressRing 
-            progress={aProg} 
-            size={56} 
-            strokeWidth={4} 
-            color={accentColor} 
-            label={primary.type === 'anniversary' ? 'Anniv' : (secondary ? 'Anniv' : 'Year')} 
-            sublabel={`${Math.round(aProg * 100)}%`} 
-          />
-          <ProgressRing 
-            progress={bProg} 
-            size={56} 
-            strokeWidth={4} 
-            color={accentColor} 
-            label="Growth" 
-            sublabel={`${age.years}y`} 
-          />
-        </View>
+        {/* Label (e.g. Wife, Luka) */}
+        <Text style={{ fontSize: 15, color: '#fff', fontWeight: '800' }}>
+          {primary.label}
+        </Text>
+
+        {/* Age */}
+        <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '600' }}>
+          Age: {age.years}y {age.months}m {age.days}d
+        </Text>
+
+        {/* Divider */}
+        <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 6 }} />
+
+        {/* Next Birthday countdown */}
+        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: '600' }}>
+          Next Birthday: {next.months}m {next.days}d ({next.totalDays} Days)
+        </Text>
       </View>
     </GlassBubble>
   );

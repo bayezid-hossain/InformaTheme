@@ -4,12 +4,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TopBar } from '../../components/TopBar';
 import { useTheme } from '../../hooks/useTheme';
 import { usePermissions } from '../../hooks/usePermissions';
-import { User, Cloud, Lock, Smartphone, Battery, Zap, AlertTriangle, Palette, PenTool, Info } from 'lucide-react-native';
+import { useWeather } from '../../hooks/useWeather';
+import * as Location from 'expo-location';
+import { User, Cloud, Lock, Smartphone, Battery, Zap, AlertTriangle, Palette, PenTool, Info, MapPin } from 'lucide-react-native';
 
 export function SettingsScreen() {
   const { colors, variant } = useTheme();
   const perms = usePermissions();
+  const { refresh: refreshWeather } = useWeather();
+  const [locationGranted, setLocationGranted] = React.useState<boolean>(false);
   const themeLabel = variant === 'darkPremium' ? 'Dark Premium' : variant === 'warmLight' ? 'Warm Light' : 'Glassmorphism';
+
+  React.useEffect(() => {
+    Location.getForegroundPermissionsAsync().then(({ status }) => {
+      setLocationGranted(status === 'granted');
+    });
+  }, []);
+
+  async function grantLocation() {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    setLocationGranted(status === 'granted');
+    if (status === 'granted') {
+      refreshWeather();
+    }
+  }
 
   function permBadge(granted: boolean) {
     return (
@@ -67,6 +85,15 @@ export function SettingsScreen() {
             {perms.loading ? (
               <Text className="text-[13px]" style={{ color: colors.text3 }}>…</Text>
             ) : permBadge(perms.fullScreenIntent)}
+          </TouchableOpacity>
+          <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
+          <TouchableOpacity
+            className="flex-row items-center px-4 py-3.5 gap-3"
+            onPress={grantLocation}
+          >
+            <View className="w-6 items-center"><MapPin size={20} color={colors.text} /></View>
+            <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Location Access</Text>
+            {permBadge(locationGranted)}
           </TouchableOpacity>
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
           <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">

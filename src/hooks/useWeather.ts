@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import * as Location from 'expo-location';
 
 export interface WeatherData {
@@ -10,23 +11,35 @@ export interface WeatherData {
 export function useWeather() {
   const [weather, setWeather] = useState<WeatherData>({ temp: 22, condition: 'Clear', location: 'Bhaluka' });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
 
   const fetchWeather = useCallback(async () => {
     try {
       // 1. Get Permission
-      let { status } = await Location.requestForegroundPermissionsAsync();
+      let { status } = await Location.getForegroundPermissionsAsync();
       if (status !== 'granted') {
         setErrorMsg('Permission to access location was denied');
         return;
       }
 
       // 2. Get Location
-      let location = await Location.getCurrentPositionAsync({});
+      let location = await Location.getLastKnownPositionAsync({});
+      if (!location) {
+        location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced
+        });
+      }
+      if (!location) return;
       const { latitude, longitude } = location.coords;
 
       // 3. Get City Name (Reverse Geocode)
-      let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
-      let cityName = geocode[0]?.city || geocode[0]?.subregion || 'Current Location';
+      let cityName = 'Current Location';
+      try {
+        let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+        cityName = geocode[0]?.city || geocode[0]?.subregion || 'Current Location';
+      } catch (err) {
+        console.warn('[useWeather] reverseGeocode failed:', err);
+      }
 
       // 4. Fetch Weather
       const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
@@ -45,10 +58,43 @@ export function useWeather() {
   }, []);
 
   useEffect(() => {
+    // 1. Initial fetch on mount
     fetchWeather();
-    const interval = setInterval(fetchWeather, 30 * 60 * 1000); // every 30 mins
-    return () => clearInterval(interval);
-  }, [fetchWeather]);
+
+    // 2. Global observer: Poll for permission state transitions (transitions to 'granted')
+    let active = true;
+    const checkPermission = async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      const granted = status === 'granted';
+      if (active) {
+        if (permissionGranted === false && granted === true) {
+          // It was just granted! Fetch weather instantly!
+          fetchWeather();
+        }
+        setPermissionGranted(granted);
+      }
+    };
+
+    const permInterval = setInterval(checkPermission, 1500);
+
+    // 3. Regular 30 minute periodic weather fetch
+    const weatherInterval = setInterval(fetchWeather, 30 * 60 * 1000);
+
+    // 4. Handle AppState transitions back to 'active'
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        fetchWeather();
+      }
+    };
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      active = false;
+      clearInterval(permInterval);
+      clearInterval(weatherInterval);
+      subscription.remove();
+    };
+  }, [permissionGranted, fetchWeather]);
 
   return { weather, refresh: fetchWeather, errorMsg };
 }

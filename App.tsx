@@ -47,9 +47,7 @@ function AppContent() {
 
   if (onboarded === null || perms.loading) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
-  const androidVersion = parseInt(Platform.Version.toString(), 10);
-  const needsNotifPerm = Platform.OS === 'android' && androidVersion >= 33;
-  const missingPermissions = !perms.overlay || !perms.fullScreenIntent || (needsNotifPerm && !perms.notifications);
+  const missingPermissions = !perms.overlay || !perms.fullScreenIntent;
 
   return (
     <ThemeContext.Provider value={themeValue}>

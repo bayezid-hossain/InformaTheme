@@ -11,6 +11,10 @@ import { useTheme } from '../hooks/useTheme';
 import { useWeather } from '../hooks/useWeather';
 import { useDateStore } from '../hooks/useDateStore';
 import { Gift, Zap } from 'lucide-react-native';
+import { ProgressRing } from './ProgressRing';
+import { liveAge, nextEventCountdown, totalDays } from '../utils/dateCalc';
+
+import { useBattery } from '../hooks/useBattery';
 
 const { width } = Dimensions.get('window');
 const PHONE_W = width - 64;
@@ -52,6 +56,42 @@ function renderBackground(variant: string, colors: any) {
   }
 }
 
+interface AnniversaryCardProps {
+  label: string;
+  date: Date;
+  accentColor: string;
+  textColor: string;
+  text3Color: string;
+}
+
+function AnniversaryCard({ label, date, accentColor, textColor, text3Color }: AnniversaryCardProps) {
+  const age = liveAge(date);
+  const daysSince = totalDays(date);
+  const prog = (daysSince % 365) / 365;
+  const sublabel = age.years >= 1 ? `${age.years}y` : `${daysSince}d`;
+  const next = nextEventCountdown(date);
+
+  return (
+    <GlassBubble style={{ width: 125, padding: 12, alignItems: 'center' }}>
+      <ProgressRing
+        progress={prog}
+        size={60}
+        strokeWidth={3.5}
+        color={accentColor}
+        label={label}
+        sublabel={sublabel}
+      />
+      <View style={{ width: '100%', height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 8 }} />
+      <Text style={{ fontSize: 8.5, color: text3Color, fontWeight: '700', textAlign: 'center', marginBottom: 2 }}>
+        Since: {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+      </Text>
+      <Text style={{ fontSize: 9, color: text3Color, fontWeight: '700', textAlign: 'center' }}>
+        Next: {next.months}m {next.days}d
+      </Text>
+    </GlassBubble>
+  );
+}
+
 export function LockscreenPreview() {
   const { colors, variant } = useTheme();
   const { weather: weatherData } = useWeather();
@@ -63,6 +103,9 @@ export function LockscreenPreview() {
   const birthdays = dates.filter(d => d.type === 'birthday');
   const anniversaries = dates.filter(d => d.type === 'anniversary');
   const milestones = dates.filter(d => d.type === 'milestone');
+
+  const { level, charging } = useBattery();
+  const pct = Math.round(level * 100);
 
   return (
     <View className="items-center">
@@ -119,10 +162,13 @@ export function LockscreenPreview() {
           {anniversaries.length > 0 && (
             <HorizontalSlider>
               {anniversaries.map(d => (
-                <MilestoneBubble 
+                <AnniversaryCard 
                   key={d.id} 
-                  primary={{ label: d.label, date: new Date(d.dateISO), type: 'anniversary' }} 
+                  label={d.label}
+                  date={new Date(d.dateISO)}
                   accentColor={colors.accent} 
+                  textColor={colors.text}
+                  text3Color={colors.text3}
                 />
               ))}
             </HorizontalSlider>
@@ -168,9 +214,6 @@ export function LockscreenPreview() {
               <Text style={{ fontSize: 10, color: colors.text, fontWeight: '700' }}>TODAY, {new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()}</Text>
             </View>
           </View>
-          <View style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 8 }}>
-            <Text style={{ fontSize: 10, color: colors.accent, fontWeight: '700' }}>BATTERY 100%</Text>
-          </View>
           <View style={{ alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', marginBottom: 24 }}>
             <Text style={{ fontSize: 10, color: colors.text, fontWeight: '700' }}>WEATHER {weatherData.temp}°C ({weatherData.location})</Text>
           </View>
@@ -179,7 +222,7 @@ export function LockscreenPreview() {
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
             <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
             <View style={{ width: 80, height: 36, backgroundColor: colors.accent, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginLeft: 8 }}>
-              <Zap size={18} color={colors.bg} fill={colors.bg} />
+              {charging && <Zap size={18} color={colors.bg} fill={colors.bg} />}
             </View>
             <View style={{ width: 6, height: 20, backgroundColor: colors.text3, borderRadius: 3, marginLeft: 8 }} />
           </View>

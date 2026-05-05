@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getJSON, setJSON } from '../services/storage';
 
 export interface Widget {
@@ -14,12 +14,8 @@ const STORAGE_KEY = 'widget_states';
 const DEFAULTS: Widget[] = [
   { id: 'clock', name: 'Clock', desc: 'Large stencil digital clock', icon: '🕐', enabled: true },
   { id: 'milestone', name: 'Milestone Tracker', desc: 'Days / age since anchor date', icon: '📅', enabled: true },
-  { id: 'anniversary', name: 'Anniversary Ring', desc: 'Circular progress to next anniversary', icon: '💍', enabled: false },
-  { id: 'growth', name: 'Growth Ring', desc: 'Progress ring for growth milestones', icon: '🌱', enabled: true },
-  { id: 'weather', name: 'Weather', desc: 'Current conditions + temperature', icon: '☁️', enabled: false },
-  { id: 'battery', name: 'Battery', desc: 'Charging animation + level', icon: '🔋', enabled: true },
-  { id: 'goal', name: 'Daily Goal', desc: 'Custom daily progress tracker', icon: '🎯', enabled: false },
-  { id: 'countdown', name: 'Event Countdown', desc: 'Days until next event', icon: '⏳', enabled: true },
+  { id: 'anniversary', name: 'Anniversary', desc: 'Circular progress to next anniversary', icon: '💍', enabled: true },
+  { id: 'weather', name: 'Weather', desc: 'Current conditions + temperature', icon: '☁️', enabled: true },
 ];
 
 export function useWidgetStore() {

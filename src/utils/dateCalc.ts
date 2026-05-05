@@ -48,3 +48,21 @@ export function anniversaryProgress(date: Date): number {
   const elapsed = differenceInDays(now, lastAnniv);
   return Math.max(0, Math.min(1, elapsed / total));
 }
+export function nextEventCountdown(date: Date): { months: number; days: number; totalDays: number } {
+  const now = new Date();
+  let next = setYear(date, now.getFullYear());
+  if (!isAfter(next, now)) next = addYears(next, 1);
+  
+  const totalDays = differenceInDays(next, now);
+  let months = differenceInMonths(next, now);
+  const afterMonths = new Date(now.getFullYear(), now.getMonth() + months, now.getDate());
+  let days = differenceInDays(next, afterMonths);
+  
+  if (days < 0) {
+    months--;
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() + months, now.getDate());
+    days = differenceInDays(next, prevMonth);
+  }
+
+  return { months, days, totalDays };
+}

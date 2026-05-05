@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, Platform } from 'react-native';
-import { Lock, Sprout, Palette, Smartphone, Bell } from 'lucide-react-native';
+import { Lock, Sprout, Palette, Smartphone, MapPin } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePermissions } from '../../hooks/usePermissions';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
@@ -23,19 +24,25 @@ interface Props {
 
 export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
   const [step, setStep] = useState(initialStep);
-  const [waiting, setWaiting] = useState<'overlay' | 'fsi' | 'notifications' | null>(null);
-  const androidVersion = parseInt(Platform.Version.toString(), 10);
-  const needsNotifPerm = Platform.OS === 'android' && androidVersion >= 33;
+  const [waiting, setWaiting] = useState<'overlay' | 'fsi' | 'location' | null>(null);
+  const [locationPerm, setLocationPerm] = useState(false);
   const perms = usePermissions();
   const accent = STEP_ACCENT[step];
-    const isLast = step === 3;
+  const isLast = step === 3;
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      setLocationPerm(status === 'granted');
+    })();
+  }, [waiting]);
 
   // Clear waiting state when the corresponding permission is granted
   useEffect(() => {
     if (waiting === 'overlay'        && perms.overlay)           setWaiting(null);
     if (waiting === 'fsi'            && perms.fullScreenIntent)  setWaiting(null);
-    if (waiting === 'notifications'  && perms.notifications)     setWaiting(null);
-  }, [perms.overlay, perms.fullScreenIntent, perms.notifications, waiting]);
+    if (waiting === 'location'       && locationPerm)            setWaiting(null);
+  }, [perms.overlay, perms.fullScreenIntent, locationPerm, waiting]);
 
   function grantOverlay() {
     if (perms.overlay) return;
@@ -49,19 +56,21 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
     setWaiting('fsi');
   }
 
-  async function grantNotifications() {
-    if (perms.notifications || !needsNotifPerm) return;
-    setWaiting('notifications');
-    await perms.requestNotifications();
+  async function grantLocation() {
+    if (locationPerm) return;
+    setWaiting('location');
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    setLocationPerm(status === 'granted');
+    setWaiting(null);
   }
 
-  const allGranted = perms.overlay && perms.fullScreenIntent && (!needsNotifPerm || perms.notifications);
+  const allGranted = perms.overlay && perms.fullScreenIntent && locationPerm;
 
   function handleCTA() {
     if (!isLast) { setStep((s) => s + 1); return; }
     if (!perms.overlay)          { grantOverlay();       return; }
     if (!perms.fullScreenIntent) { grantFSI();           return; }
-    if (needsNotifPerm && !perms.notifications) { grantNotifications(); return; }
+    if (!locationPerm)           { grantLocation();      return; }
     onDone();
   }
 
@@ -204,49 +213,47 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
               )}
             </View>
 
-            {/* Notifications permission card (Android 13+) */}
-            {needsNotifPerm && (
-              <View style={{
-                width: width - 64,
-                backgroundColor: CARD_BG,
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: BORDER,
-                padding: 16,
-                marginTop: 12,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-              }}>
-                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: perms.notifications ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' }}>
-                  <Bell size={18} color={TEXT} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: TEXT, marginBottom: 2 }}>
-                    Notifications
-                  </Text>
-                  <Text style={{ fontSize: 11, color: TEXT3 }}>
-                    Required to trigger lockscreen overlay
-                  </Text>
-                </View>
-                {perms.notifications ? (
-                  <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(74,222,128,0.15)' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#4ADE80' }}>✓</Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    onPress={grantNotifications}
-                    style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, backgroundColor: accent }}
-                  >
-                    {waiting === 'notifications' ? (
-                      <ActivityIndicator size="small" color="#000" />
-                    ) : (
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#000' }}>Grant</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
+            {/* Location permission card */}
+            <View style={{
+              width: width - 64,
+              backgroundColor: CARD_BG,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: BORDER,
+              padding: 16,
+              marginTop: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+            }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: locationPerm ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' }}>
+                <MapPin size={18} color={TEXT} />
               </View>
-            )}
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: TEXT, marginBottom: 2 }}>
+                  Location Services
+                </Text>
+                <Text style={{ fontSize: 11, color: TEXT3 }}>
+                  Required for real-time local weather
+                </Text>
+              </View>
+              {locationPerm ? (
+                <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(74,222,128,0.15)' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#4ADE80' }}>✓</Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={grantLocation}
+                  style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, backgroundColor: accent }}
+                >
+                  {waiting === 'location' ? (
+                    <ActivityIndicator size="small" color="#000" />
+                  ) : (
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#000' }}>Grant</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
 
             {/* FSI hint if system page not found */}
             {!perms.fullScreenIntent && (
