@@ -84,7 +84,6 @@ function withAndroidManifestPatch(config) {
         $: {
           'android:name': '.LockscreenActivity',
           'android:showWhenLocked': 'true',
-          'android:turnScreenOn': 'true',
           'android:launchMode': 'singleInstance',
           'android:theme': '@android:style/Theme.Black.NoTitleBar.Fullscreen',
           'android:exported': 'false',

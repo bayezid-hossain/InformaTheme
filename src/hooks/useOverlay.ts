@@ -41,7 +41,7 @@ export function useOverlay() {
         text2: colors.text2,
         text3: colors.text3,
         tagline: colors.tagline || 'BEST YEARS AHEAD',
-        weather: weather || 'WEATHER 22°C (Bhaluka)'
+        weather: weather || ''
       });
       const datesJson = JSON.stringify(dates);
       await LockscreenModule.syncOverlayData(themeJson, datesJson);

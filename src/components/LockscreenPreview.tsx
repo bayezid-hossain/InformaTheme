@@ -4,17 +4,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Clock } from './Clock';
 import { GlassBubble } from './GlassBubble';
 import { MilestoneBubble } from './MilestoneBubble';
+import { MilestoneCard } from './MilestoneCard';
+import { HorizontalSlider } from './HorizontalSlider';
 import { BatteryWidget } from './BatteryWidget';
 import { useTheme } from '../hooks/useTheme';
 import { useWeather } from '../hooks/useWeather';
-import { Gift, Zap, Phone, Camera } from 'lucide-react-native';
+import { useDateStore } from '../hooks/useDateStore';
+import { Gift, Zap } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 const PHONE_W = width - 64;
 const PHONE_H = PHONE_W * 2.1;
-
-const PRIMARY_DATE = { label: "Luka's Live Age", date: new Date('2022-06-03'), type: 'birthday' as const };
-const SECONDARY_DATE = { label: 'Anniversary', date: new Date('2023-05-10'), type: 'anniversary' as const };
 
 function renderBackground(variant: string, colors: any) {
   switch (variant) {
@@ -55,9 +55,14 @@ function renderBackground(variant: string, colors: any) {
 export function LockscreenPreview() {
   const { colors, variant } = useTheme();
   const { weather: weatherData } = useWeather();
+  const { dates } = useDateStore();
   const tagline = colors.tagline || 'BEST YEARS AHEAD';
   const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'short', month: '2-digit', day: '2-digit' }).replace(',', '').toUpperCase();
   const taglineText = `${todayDate} ▼ ${tagline} ▼`;
+
+  const birthdays = dates.filter(d => d.type === 'birthday');
+  const anniversaries = dates.filter(d => d.type === 'anniversary');
+  const milestones = dates.filter(d => d.type === 'milestone');
 
   return (
     <View className="items-center">
@@ -97,28 +102,58 @@ export function LockscreenPreview() {
             <Clock style="stencil" color={colors.text} size={80} />
           </View>
 
-          {/* Milestone bubble */}
-          <MilestoneBubble primary={PRIMARY_DATE} secondary={SECONDARY_DATE} accentColor={colors.accent} />
-
-          {/* First Steps Progress */}
-          <View style={{ marginTop: 16, marginBottom: 8 }}>
-            <Text style={{ fontSize: 11, color: colors.text2, fontWeight: '600' }}>Luka's First Steps:</Text>
-            <Text style={{ fontSize: 18, color: colors.text, fontWeight: '800', marginBottom: 6 }}>1011 Days Ago</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <View key={i} style={{ height: 4, flex: 1, backgroundColor: i <= 2 ? colors.accent : colors.card, borderRadius: 2 }} />
+          {/* Birthdays Slider */}
+          {birthdays.length > 0 && (
+            <HorizontalSlider>
+              {birthdays.map(d => (
+                <MilestoneBubble 
+                  key={d.id} 
+                  primary={{ label: d.label, date: new Date(d.dateISO), type: 'birthday' }} 
+                  accentColor={colors.accent} 
+                />
               ))}
-              <Text style={{ fontSize: 10, color: colors.text3, fontWeight: '700', marginLeft: 4 }}>45678</Text>
-            </View>
-          </View>
+            </HorizontalSlider>
+          )}
 
-          {/* Event pill */}
-          <GlassBubble pill style={{ alignSelf: 'flex-start', marginTop: 12, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ fontSize: 12, color: colors.text, fontWeight: '700' }}>Wife's Birthday: 18 Days</Text>
-              <Gift size={14} color="#F87171" />
-            </View>
-          </GlassBubble>
+          {/* Anniversaries Slider */}
+          {anniversaries.length > 0 && (
+            <HorizontalSlider>
+              {anniversaries.map(d => (
+                <MilestoneBubble 
+                  key={d.id} 
+                  primary={{ label: d.label, date: new Date(d.dateISO), type: 'anniversary' }} 
+                  accentColor={colors.accent} 
+                />
+              ))}
+            </HorizontalSlider>
+          )}
+
+          {/* Milestones Slider */}
+          {milestones.length > 0 && (
+            <HorizontalSlider>
+              {milestones.map(d => (
+                <MilestoneCard 
+                  key={d.id}
+                  label={d.label}
+                  date={new Date(d.dateISO)}
+                  accentColor={colors.accent}
+                  textColor={colors.text}
+                  text2Color={colors.text2}
+                  text3Color={colors.text3}
+                />
+              ))}
+            </HorizontalSlider>
+          )}
+
+          {/* Event pill (Quick highlights for soonest events) */}
+          {dates.some(d => d.type !== 'milestone') && (
+            <GlassBubble pill style={{ alignSelf: 'flex-start', marginTop: 12, backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 12, color: colors.text, fontWeight: '700' }}>Next Event Coming Soon</Text>
+                <Gift size={14} color="#F87171" />
+              </View>
+            </GlassBubble>
+          )}
 
           <Text style={{ fontSize: 11, color: colors.text2, marginTop: 12, fontWeight: '500' }}>
             Fortunately, you will always be by my side, too.

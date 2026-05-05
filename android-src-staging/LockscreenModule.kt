@@ -9,6 +9,7 @@ import android.provider.Settings
 import com.facebook.react.bridge.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 class LockscreenModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
@@ -69,7 +70,7 @@ class LockscreenModule(private val reactContext: ReactApplicationContext) :
                 .putString("text2", theme.optString("text2", "#8892a4"))
                 .putString("text3", theme.optString("text3", "#4a5568"))
                 .putString("tagline", theme.optString("tagline", "BEST YEARS AHEAD"))
-                .putString("weather", theme.optString("weather", "WEATHER 22°C (Bhaluka)"))
+                .putString("weather", theme.optString("weather", ""))
                 .putString("dates", datesJson)
                 .apply()
 
@@ -104,6 +105,28 @@ class LockscreenModule(private val reactContext: ReactApplicationContext) :
             true
         }
         promise.resolve(granted)
+    }
+
+    // ── Debug logs ────────────────────────────────────────────────────────────
+
+    @ReactMethod
+    fun getLogs(promise: Promise) {
+        try {
+            val file = File(reactContext.filesDir, LockscreenService.LOG_FILE)
+            promise.resolve(if (file.exists()) file.readText() else "(no log file yet)")
+        } catch (e: Exception) {
+            promise.reject("LOG_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun clearLogs(promise: Promise) {
+        try {
+            File(reactContext.filesDir, LockscreenService.LOG_FILE).delete()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("LOG_ERROR", e.message)
+        }
     }
 
     @ReactMethod

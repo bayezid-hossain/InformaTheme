@@ -2,6 +2,54 @@
 
 ---
 
+## 2026-05-05 — Fix lockscreen prevents phone from locking (SCREEN_ON trigger)
+
+**Plan:** Direct `startActivity()` on `SCREEN_OFF` + `FLAG_TURN_SCREEN_ON` caused screen to wake immediately after locking — phone never truly locked. Fix: trigger on `ACTION_SCREEN_ON` instead (screen goes off = phone locks normally; overlay launches when user presses power to wake).
+
+**Steps completed:**
+1. `LockscreenService.kt` — Changed trigger from `ACTION_SCREEN_OFF` → `ACTION_SCREEN_ON`.
+2. `LockscreenActivity.kt` — Removed `setTurnScreenOn(true)` and `FLAG_TURN_SCREEN_ON`. Kept `setShowWhenLocked(true)` and `FLAG_SHOW_WHEN_LOCKED`.
+3. `plugins/withInformaThemeModule.js` — Removed `android:turnScreenOn="true"` from `LockscreenActivity` manifest attrs.
+
+**Deviations:** None.
+
+---
+
+## 2026-05-05 — Fix vibration: replace FSI notification with direct Activity launch
+
+**Plan:** Logs confirmed Android 15 OEM overrides `enableVibration(false)` on `IMPORTANCE_HIGH` channels (`vibration=true` stored despite our code). Only fix: eliminate the FSI notification entirely and launch `LockscreenActivity` directly via `startActivity()` from the foreground service. App has `SYSTEM_ALERT_WINDOW` — Android exempts such apps from background activity launch restrictions on API 29+.
+
+**Steps completed:**
+1. `LockscreenService.kt` — Removed entire FSI channel + FSI notification path. `showLockscreenActivity()` now calls `startActivity()` with `FLAG_ACTIVITY_NEW_TASK | SINGLE_TOP | NO_ANIMATION`. `dismissLockscreen()` broadcasts `ACTION_DISMISS` only (no `nm().cancel()`). Foreground service channel stays `IMPORTANCE_LOW` (no vibration). Logging preserved.
+
+**Deviations:** None.
+
+---
+
+## 2026-05-05 — Lockscreen UX Polish (vibration, dim, layout)
+
+**Plan:** Remove FSI notification vibration, add auto-dim after 7s inactivity, redesign lockscreen layout to match design mockup with dynamic data only.
+
+**Steps completed:**
+1. `LockscreenService.kt` — Changed `FSI_CHANNEL_ID` to `informatheme_fsi_v2` (forces fresh channel creation), added `enableVibration(false)` + `vibrationPattern = longArrayOf(0L)` + `enableLights(false)` to FSI channel. Added `.setVibrate(longArrayOf(0L))` to notification builder.
+2. `LockscreenActivity.kt` — Added `dimHandler`/`dimRunnable` that sets `window.screenBrightness = 0.02f` after 7 000 ms. Any touch calls `undim()` which restores brightness and resets the timer. Scheduled in `onResume`, cleared in `onPause`/`onDestroy`.
+3. `LockscreenActivity.kt` — Full layout rewrite:
+   - Battery row (centered, dynamic %)
+   - Tagline row (dynamic date + theme tagline)
+   - Large clock (dynamic)
+   - Birthday card (left) + circle rings for anniversaries / first milestone (right) — all dynamic from dates JSON
+   - Milestone linear bars below (label, "X Days Ago", progress bar showing year-cycle %, digit-spaced day count)
+   - Upcoming chips (≤ 30 days, dynamic)
+   - Rotating quote
+   - TODAY + WEATHER pills (hour dynamic, weather from prefs)
+   - Unlock slider
+   - Fixed bottom bar (phone | home bar | camera)
+4. Removed all hardcoded sample strings ("Current Goal: Make memories.", static battery pill, etc.)
+
+**Deviations:** None.
+
+---
+
 ## 2026-05-03 — Project Initialization
 
 **Plan:** Initialize Expo project with tooling scripts, NativeWind config, folder structure, config plugin, and meta files.

@@ -5,21 +5,20 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.LayerDrawable
 import android.util.Log
-import android.util.TypedValue
 import android.view.*
 import android.widget.*
-import android.widget.Toast
 import org.json.JSONArray
-import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -28,27 +27,31 @@ class LockscreenActivity : Activity() {
 
     companion object {
         const val ACTION_DISMISS = "com.informatheme.app.DISMISS_LOCKSCREEN"
+        private const val DIM_DELAY = 7000L
     }
 
     private var clockTextView: TextView? = null
-    private var ampmTextView: TextView? = null
     private val handler = Handler(Looper.getMainLooper())
     private val timeFormat = SimpleDateFormat("hh:mm", Locale.getDefault())
-    private val ampmFormat = SimpleDateFormat("a", Locale.getDefault())
     private var dismissReceiver: BroadcastReceiver? = null
+    private var dataReceiver: BroadcastReceiver? = null
+    private var batteryReceiver: BroadcastReceiver? = null
 
     private var batteryLevel: Int = 100
     private var isCharging: Boolean = false
     private var batteryFillView: View? = null
     private var batteryText: TextView? = null
 
-    private var dataReceiver: BroadcastReceiver? = null
-    private var batteryReceiver: BroadcastReceiver? = null
+    private val dimHandler = Handler(Looper.getMainLooper())
+    private val dimRunnable = Runnable {
+        val lp = window.attributes
+        lp.screenBrightness = 0.02f
+        window.attributes = lp
+    }
 
     private val clockUpdater = object : Runnable {
         override fun run() {
             clockTextView?.text = timeFormat.format(Date())
-            ampmTextView?.text = ampmFormat.format(Date()).uppercase()
             handler.postDelayed(this, 30_000)
         }
     }
@@ -56,28 +59,45 @@ class LockscreenActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applyLockscreenFlags()
-        
-        Log.d("LockscreenActivity", "onCreate initializing battery")
-        // Initial battery state
-        val ifilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        val batteryStatus = registerReceiver(null, ifilter)
-        batteryStatus?.let { intent ->
-            val level = intent.getIntExtra("level", -1)
-            val scale = intent.getIntExtra("scale", -1)
+        val batteryStatus = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        batteryStatus?.let {
+            val level = it.getIntExtra("level", -1)
+            val scale = it.getIntExtra("scale", -1)
             batteryLevel = (level * 100 / scale.toFloat()).toInt()
-            val status = intent.getIntExtra("status", -1)
+            val status = it.getIntExtra("status", -1)
             isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
                          status == android.os.BatteryManager.BATTERY_STATUS_FULL
         }
-
         refreshUI()
         handler.postDelayed(clockUpdater, 30_000)
         registerReceivers()
     }
 
+    override fun onResume() {
+        super.onResume()
+        scheduleDim()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        dimHandler.removeCallbacks(dimRunnable)
+    }
+
+    private fun scheduleDim() {
+        dimHandler.removeCallbacks(dimRunnable)
+        dimHandler.postDelayed(dimRunnable, DIM_DELAY)
+    }
+
+    private fun undim() {
+        dimHandler.removeCallbacks(dimRunnable)
+        val lp = window.attributes
+        lp.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        window.attributes = lp
+        scheduleDim()
+    }
+
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        Log.d("LockscreenActivity", "onNewIntent: refreshing UI")
         refreshUI()
     }
 
@@ -92,28 +112,21 @@ class LockscreenActivity : Activity() {
         val text2Color  = parseColor(prefs.getString("text2",  "#8892a4"), "#8892a4")
         val text3Color  = parseColor(prefs.getString("text3",  "#4a5568"), "#4a5568")
         val tagline     = prefs.getString("tagline", "BEST YEARS AHEAD") ?: "BEST YEARS AHEAD"
-        val weather     = prefs.getString("weather", "WEATHER 22°C (Bhaluka)") ?: "WEATHER 22°C (Bhaluka)"
+        val weather     = prefs.getString("weather", "") ?: ""
         val datesJson   = prefs.getString("dates", "[]") ?: "[]"
-
-        Log.d("LockscreenActivity", "refreshUI: variant=$variant, bg=$bgColor")
-
-        setContentView(buildOverlayView(variant, bgColor, bg1Color, bg2Color, textColor, text2Color, text3Color, accentColor, tagline, weather, datesJson))
-        updateBatteryUI() // Ensure battery UI matches initial state
+        setContentView(buildOverlayView(variant, bgColor, bg1Color, bg2Color,
+            textColor, text2Color, text3Color, accentColor, tagline, weather, datesJson))
+        updateBatteryUI()
     }
 
     private fun applyLockscreenFlags() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
-            setTurnScreenOn(true)
         }
-        window.addFlags(
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-        )
+        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
     }
 
     private fun registerReceivers() {
-        // Dismiss / Present
         dismissReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 when (intent.action) {
@@ -126,101 +139,115 @@ class LockscreenActivity : Activity() {
             addAction(Intent.ACTION_USER_PRESENT)
             addAction(ACTION_DISMISS)
         }
-
-        // Data Update
         dataReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
-                if (intent.action == "com.informatheme.app.DATA_UPDATED") {
-                    Log.d("LockscreenActivity", "Broadcast received: DATA_UPDATED")
-                    refreshUI()
-                }
+                if (intent.action == "com.informatheme.app.DATA_UPDATED") refreshUI()
             }
         }
-        val dataFilter = IntentFilter("com.informatheme.app.DATA_UPDATED")
-
-        // Battery
         batteryReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
-                if (intent.action == Intent.ACTION_BATTERY_CHANGED) {
-                    val level = intent.getIntExtra("level", -1)
-                    val scale = intent.getIntExtra("scale", -1)
-                    batteryLevel = (level * 100 / scale.toFloat()).toInt()
-                    
-                    val status = intent.getIntExtra("status", -1)
-                    isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
-                                 status == android.os.BatteryManager.BATTERY_STATUS_FULL
-                    
-                    updateBatteryUI()
-                }
+                if (intent.action != Intent.ACTION_BATTERY_CHANGED) return
+                val level = intent.getIntExtra("level", -1)
+                val scale = intent.getIntExtra("scale", -1)
+                batteryLevel = (level * 100 / scale.toFloat()).toInt()
+                val status = intent.getIntExtra("status", -1)
+                isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                             status == android.os.BatteryManager.BATTERY_STATUS_FULL
+                updateBatteryUI()
             }
         }
-        val batteryFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(dismissReceiver, filter, Context.RECEIVER_EXPORTED)
-            registerReceiver(dataReceiver, dataFilter, Context.RECEIVER_EXPORTED)
-            registerReceiver(batteryReceiver, batteryFilter, Context.RECEIVER_EXPORTED)
+            registerReceiver(dataReceiver, IntentFilter("com.informatheme.app.DATA_UPDATED"), Context.RECEIVER_EXPORTED)
+            registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED), Context.RECEIVER_EXPORTED)
         } else {
             registerReceiver(dismissReceiver, filter)
-            registerReceiver(dataReceiver, dataFilter)
-            registerReceiver(batteryReceiver, batteryFilter)
+            registerReceiver(dataReceiver, IntentFilter("com.informatheme.app.DATA_UPDATED"))
+            registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         }
     }
 
     private fun updateBatteryUI() {
-        batteryFillView?.let { fill ->
-            val lp = fill.layoutParams as FrameLayout.LayoutParams
+        batteryFillView?.let {
+            val lp = it.layoutParams as FrameLayout.LayoutParams
             lp.width = (batteryLevel * (dp(45) - dp(4)) / 100)
-            fill.layoutParams = lp
+            it.layoutParams = lp
         }
         batteryText?.text = "$batteryLevel%${if (isCharging) " ⚡" else ""}"
     }
 
-    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
-
-    private inner class SwipeDismissTouchListener : View.OnTouchListener {
-        private var startX = 0f
-        private var startY = 0f
-        private val swipeThreshold = 150
-
-        override fun onTouch(v: View, event: MotionEvent): Boolean {
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    startX = event.rawX
-                    startY = event.rawY
-                    return true
-                }
-                MotionEvent.ACTION_UP -> {
-                    val deltaX = event.rawX - startX
-                    val deltaY = event.rawY - startY
-                    if (Math.abs(deltaX) > swipeThreshold || Math.abs(deltaY) > swipeThreshold) {
-                        finishAndRemoveTask()
-                        return true
-                    }
-                }
-            }
-            return false
-        }
-    }
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     @Suppress("OVERRIDE_DEPRECATION", "MissingSuperCall")
-    override fun onBackPressed() { /* block back key on lockscreen */ }
+    override fun onBackPressed() {}
 
     override fun onDestroy() {
         handler.removeCallbacks(clockUpdater)
-        clockTextView = null
-        ampmTextView  = null
-        batteryFillView = null
-        batteryText = null
-        
+        dimHandler.removeCallbacks(dimRunnable)
+        clockTextView = null; batteryFillView = null; batteryText = null
         try { unregisterReceiver(dismissReceiver) } catch (_: Exception) {}
-        try { unregisterReceiver(dataReceiver) } catch (_: Exception) {}
+        try { unregisterReceiver(dataReceiver) }    catch (_: Exception) {}
         try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
-        
         super.onDestroy()
     }
 
-    // ── UI builder ────────────────────────────────────────────────────────────
+    // ── Data parsing ──────────────────────────────────────────────────────────
+
+    data class DateEntry(
+        val label: String, val type: String, val icon: String,
+        val daysSince: Long, val years: Int, val months: Int,
+        val daysRemainder: Int, val daysUntilNext: Int?
+    )
+
+    private fun parseDatesJson(json: String): List<DateEntry> {
+        val result = mutableListOf<DateEntry>()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj     = arr.getJSONObject(i)
+                val label   = obj.optString("label", "")
+                val dateISO = obj.optString("dateISO", "")
+                val type    = obj.optString("type", "milestone")
+                val icon    = obj.optString("icon", "")
+                if (label.isEmpty() || dateISO.isEmpty()) continue
+
+                val cal   = Calendar.getInstance()
+                val parts = dateISO.split("-", "T")
+                if (parts.size >= 3) {
+                    cal.set(parts[0].toInt(), parts[1].toInt() - 1,
+                        parts[2].substring(0, minOf(2, parts[2].length)).toInt())
+                    cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+                    cal.set(Calendar.SECOND, 0);      cal.set(Calendar.MILLISECOND, 0)
+                }
+                val now       = Calendar.getInstance()
+                val daysSince = TimeUnit.MILLISECONDS.toDays(now.timeInMillis - cal.timeInMillis)
+                var years     = now.get(Calendar.YEAR)  - cal.get(Calendar.YEAR)
+                var months    = now.get(Calendar.MONTH) - cal.get(Calendar.MONTH)
+                if (months < 0) { years--; months += 12 }
+                val afterMonths = (cal.clone() as Calendar).apply {
+                    add(Calendar.YEAR, years); add(Calendar.MONTH, months)
+                }
+                val daysRemainder = TimeUnit.MILLISECONDS.toDays(
+                    now.timeInMillis - afterMonths.timeInMillis).toInt().coerceAtLeast(0)
+
+                val daysUntilNext: Int? = if (type != "milestone") {
+                    val next = Calendar.getInstance().apply {
+                        set(Calendar.MONTH, cal.get(Calendar.MONTH))
+                        set(Calendar.DAY_OF_MONTH, cal.get(Calendar.DAY_OF_MONTH))
+                        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0);      set(Calendar.MILLISECOND, 0)
+                    }
+                    if (!next.after(now)) next.add(Calendar.YEAR, 1)
+                    TimeUnit.MILLISECONDS.toDays(next.timeInMillis - now.timeInMillis).toInt()
+                } else null
+
+                result.add(DateEntry(label, type, icon, daysSince, years, months, daysRemainder, daysUntilNext))
+            }
+        } catch (e: Exception) { Log.e("LockscreenActivity", "parseDatesJson: ${e.message}") }
+        return result
+    }
+
+    // ── Main UI builder ───────────────────────────────────────────────────────
 
     @Suppress("DEPRECATION")
     private fun buildOverlayView(
@@ -229,443 +256,475 @@ class LockscreenActivity : Activity() {
         accentColor: Int, tagline: String, weather: String, datesJson: String
     ): View {
         val ctx = this
-        val density = resources.displayMetrics.density
-        fun dp(v: Int) = (v * density).toInt()
+        val MP  = ViewGroup.LayoutParams.MATCH_PARENT
+        val WC  = ViewGroup.LayoutParams.WRAP_CONTENT
 
         val root = FrameLayout(ctx).apply {
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(bgColor, bg1Color, bg2Color))
-            isClickable = true
-            isFocusable  = true
-            setOnTouchListener(SwipeDismissTouchListener())
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                intArrayOf(bgColor, bg1Color, bg2Color))
+            isClickable = true; isFocusable = true
         }
 
-        // Background shapes
-        addBackgroundShapes(ctx, root, variant, density)
+        addBackgroundShapes(ctx, root, variant, resources.displayMetrics.density)
 
         val scroll = ScrollView(ctx).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            setPadding(dp(24), dp(64), dp(24), dp(40))
+            layoutParams = FrameLayout.LayoutParams(MP, MP)
+            setPadding(0, dp(52), 0, dp(60))
             isVerticalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
         }
-
         val content = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+            layoutParams = ViewGroup.LayoutParams(MP, WC)
         }
 
-        // Battery row
-        val batteryRow = LinearLayout(ctx).apply {
+        // Battery
+        content.addView(LinearLayout(ctx).apply {
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(16) }
-        }
-        batteryRow.addView(buildBatteryWidget(ctx, density, accentColor))
-        content.addView(batteryRow)
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(10) }
+            addView(buildBatteryWidget(ctx, accentColor))
+        })
 
-        // Date tagline
-        val dateFormat = SimpleDateFormat("EEE MM-dd", Locale.getDefault())
+        // Tagline
+        val dateFmt = SimpleDateFormat("EEE MM-dd", Locale.getDefault())
         content.addView(TextView(ctx).apply {
-            text = "${dateFormat.format(Date()).uppercase()} \u25BC $tagline \u25BC"
-            setTextColor(textColor)
-            textSize     = 10f
-            letterSpacing = 0.15f
-            gravity      = Gravity.CENTER
-            setTypeface(typeface, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(12) }
+            text = "${dateFmt.format(Date()).uppercase()} ▼ $tagline ▼"
+            setTextColor(textColor); textSize = 10f; letterSpacing = 0.15f
+            gravity = Gravity.CENTER; setTypeface(typeface, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(2) }
         })
 
         // Clock
-        val clockTv = TextView(ctx).apply {
-            text     = timeFormat.format(Date())
-            setTextColor(textColor)
-            textSize = 80f
+        content.addView(TextView(ctx).apply {
+            text = timeFormat.format(Date())
+            setTextColor(textColor); textSize = 80f
             typeface = Typeface.create("sans-serif-condensed-light", Typeface.NORMAL)
-            gravity  = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(20) }
-        }
-        clockTextView = clockTv
-        content.addView(clockTv)
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(20) }
+        }.also { clockTextView = it })
 
-        // Anchor dates / Milestones
-        try {
-            val arr = JSONArray(datesJson)
-            for (i in 0 until arr.length()) {
-                val obj     = arr.getJSONObject(i)
-                val label   = obj.optString("label",   "")
-                val dateISO = obj.optString("dateISO", "")
-                val type    = obj.optString("type",    "")
-                if (label.isEmpty() || dateISO.isEmpty()) continue
-                content.addView(
-                    buildDateCard(ctx, density, label, dateISO, type,
-                        bgColor, textColor, text2Color, text3Color, accentColor)
-                )
+        // Date carousels
+        val dates         = parseDatesJson(datesJson)
+        val birthdays     = dates.filter { it.type == "birthday" }
+        val anniversaries = dates.filter { it.type == "anniversary" }
+        val milestones    = dates.filter { it.type == "milestone" }
+
+        if (birthdays.isNotEmpty())
+            content.addView(buildCarousel(
+                birthdays.map { buildBirthdayCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color) }
+            ))
+
+        if (anniversaries.isNotEmpty())
+            content.addView(buildCarousel(
+                anniversaries.map { buildAnniversaryCard(ctx, it, accentColor, bg1Color, textColor, text3Color) },
+                narrow = true
+            ))
+
+        if (milestones.isNotEmpty())
+            content.addView(buildCarousel(
+                milestones.map { buildMilestoneCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color) }
+            ))
+
+        // Upcoming chips ≤30 days
+        val upcoming = dates.filter { it.type != "milestone" && it.daysUntilNext != null && it.daysUntilNext!! <= 30 }
+        if (upcoming.isNotEmpty()) {
+            val col = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply {
+                    bottomMargin = dp(16); marginStart = dp(20); marginEnd = dp(20)
+                }
             }
-        } catch (_: Exception) {}
+            upcoming.forEach { d ->
+                val emoji = if (d.type == "birthday") "🎂" else "💍"
+                col.addView(buildPill(ctx, "${d.label}: ${d.daysUntilNext} Days $emoji", textColor).apply {
+                    (layoutParams as LinearLayout.LayoutParams).bottomMargin = dp(6)
+                })
+            }
+            content.addView(col)
+        }
 
-        // Motivational quote
-        val quotes = arrayOf(
-            "Every day counts.",
-            "Time reveals what matters.",
-            "The present is a gift.",
-            "Growth takes patience.",
-            "Moments become memories."
-        )
+        // Quote
+        val quotes = arrayOf("Every day counts.", "Time reveals what matters.",
+            "The present is a gift.", "Growth takes patience.", "Moments become memories.")
         content.addView(TextView(ctx).apply {
             text = "\"${quotes[Calendar.getInstance().get(Calendar.DAY_OF_YEAR) % quotes.size]}\""
-            setTextColor(text3Color)
-            textSize = 13f
-            gravity  = Gravity.CENTER
+            setTextColor(text3Color); textSize = 13f; gravity = Gravity.CENTER
             setTypeface(typeface, Typeface.ITALIC)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(24) }
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply {
+                topMargin = dp(4); bottomMargin = dp(20)
+                marginStart = dp(20); marginEnd = dp(20)
+            }
         })
 
-        // Unlock Slider
-        content.addView(buildUnlockSlider(ctx, density, accentColor, textColor, text3Color))
-
-        // Goal text
-        content.addView(TextView(ctx).apply {
-            text = "Current Goal: Make memories."
-            setTextColor(text2Color)
-            textSize = 11f
-            setTypeface(typeface, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(16) }
-        })
-
-        // Bottom Pills
-        val bottomPills = LinearLayout(ctx).apply {
+        // Pills
+        val pillsCol = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(24); bottomMargin = dp(40) }
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply {
+                bottomMargin = dp(16); marginStart = dp(20); marginEnd = dp(20)
+            }
         }
-        val dayName = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date()).uppercase()
-        bottomPills.addView(buildPill(ctx, density, "TODAY, $dayName", textColor))
-        
-        // Dynamic Battery Pill
-        bottomPills.addView(buildPill(ctx, density, "BATTERY $batteryLevel%", accentColor).apply {
-            val lp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(8) }
-            layoutParams = lp
+        val hour = SimpleDateFormat("H", Locale.getDefault()).format(Date())
+        pillsCol.addView(buildPill(ctx, "TODAY  ${hour}h", textColor).apply {
+            (layoutParams as LinearLayout.LayoutParams).bottomMargin = dp(8)
         })
+        if (weather.isNotEmpty()) pillsCol.addView(buildPill(ctx, weather, textColor))
+        content.addView(pillsCol)
 
-        bottomPills.addView(buildPill(ctx, density, weather, textColor).apply {
-            val lp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(8) }
-            layoutParams = lp
+        // Unlock slider
+        content.addView(LinearLayout(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply {
+                marginStart = dp(20); marginEnd = dp(20)
+            }
+            addView(buildUnlockSlider(ctx, accentColor, text3Color))
         })
-        content.addView(bottomPills)
 
         scroll.addView(content)
         root.addView(scroll)
 
-        // Swipe up → dismiss overlay
-        root.setOnTouchListener(object : View.OnTouchListener {
-            private var startY    = 0f
-            private var startTime = 0L
-
-            override fun onTouch(v: View, event: MotionEvent): Boolean {
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        startY    = event.rawY
-                        startTime = System.currentTimeMillis()
-                        return true
-                    }
+        // Touch: undim + swipe-up dismiss
+        scroll.setOnTouchListener(object : View.OnTouchListener {
+            private var startY = 0f; private var startTime = 0L
+            override fun onTouch(v: View, e: MotionEvent): Boolean {
+                when (e.action) {
+                    MotionEvent.ACTION_DOWN -> { startY = e.rawY; startTime = System.currentTimeMillis(); undim() }
                     MotionEvent.ACTION_UP -> {
-                        val dy = startY - event.rawY
+                        val dy = startY - e.rawY
                         val dt = System.currentTimeMillis() - startTime
-                        if (dy > 200 && dt < 500) {
-                            finishAndRemoveTask()
-                            return true
-                        }
+                        if (dy > 200 && dt < 500) { finishAndRemoveTask(); return true }
                     }
                 }
                 return false
             }
         })
+        root.setOnTouchListener { _, e -> if (e.action == MotionEvent.ACTION_DOWN) undim(); false }
 
         return root
     }
 
-    private fun buildUnlockSlider(ctx: Context, density: Float, accentColor: Int, textColor: Int, text3Color: Int): View {
-        fun dp(v: Int) = (v * density).toInt()
-        val layout = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(40) }
+    // ── Card carousels ────────────────────────────────────────────────────────
+
+    private fun buildCarousel(cards: List<View>, narrow: Boolean = false): View {
+        val MP  = ViewGroup.LayoutParams.MATCH_PARENT
+        val WC  = ViewGroup.LayoutParams.WRAP_CONTENT
+        val screenW = resources.displayMetrics.widthPixels
+        val sidePad = dp(20)
+        val gap     = dp(12)
+        // narrow = show 2 per view (anniversary circles); wide = single card with peek
+        val cardW = if (narrow) {
+            (screenW - sidePad * 2 - gap) / 2
+        } else {
+            screenW - sidePad * 2 - dp(24) // 24dp peek of next card
         }
-        layout.addView(View(ctx).apply {
-            layoutParams = LinearLayout.LayoutParams(0, dp(1), 1f)
-            setBackgroundColor(Color.argb(50, 255, 255, 255))
-        })
-        layout.addView(FrameLayout(ctx).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(80), dp(36)).apply { marginStart = dp(8) }
-            background = GradientDrawable().apply {
-                setColor(accentColor)
-                cornerRadius = dp(8).toFloat()
+
+        val hScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            clipToPadding = false
+            setPadding(sidePad, 0, sidePad, 0)
+            overScrollMode = View.OVER_SCROLL_NEVER
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(16) }
+        }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = ViewGroup.LayoutParams(WC, WC)
+        }
+        cards.forEachIndexed { i, card ->
+            card.layoutParams = LinearLayout.LayoutParams(cardW, WC).apply {
+                if (i < cards.size - 1) marginEnd = gap
             }
-            addView(TextView(ctx).apply {
-                text = "⚡"
-                gravity = Gravity.CENTER
-                textSize = 18f
-            })
-        })
-        layout.addView(View(ctx).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(6), dp(20)).apply { marginStart = dp(8) }
-            background = GradientDrawable().apply {
-                setColor(text3Color)
-                cornerRadius = dp(3).toFloat()
-            }
-        })
-        return layout
+            row.addView(card)
+        }
+        hScroll.addView(row)
+        return hScroll
     }
 
-    private fun buildPill(ctx: Context, density: Float, textStr: String, textColor: Int): View {
-        fun dp(v: Int) = (v * density).toInt()
-        return TextView(ctx).apply {
-            text = textStr
-            setTextColor(textColor)
-            textSize = 10f
+    private fun cardBackground(bg1Color: Int): GradientDrawable = GradientDrawable().apply {
+        setColor(Color.argb(180, Color.red(bg1Color), Color.green(bg1Color), Color.blue(bg1Color)))
+        cornerRadius = dp(16).toFloat()
+        setStroke(dp(1), Color.argb(30, 255, 255, 255))
+    }
+
+    private fun buildBirthdayCard(
+        ctx: Context, bd: DateEntry,
+        accentColor: Int, bg1Color: Int,
+        textColor: Int, text2Color: Int, text3Color: Int
+    ): View {
+        val MP = ViewGroup.LayoutParams.MATCH_PARENT
+        val WC = ViewGroup.LayoutParams.WRAP_CONTENT
+        return LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = cardBackground(bg1Color)
+
+            addView(TextView(ctx).apply {
+                text = "• Born ${"%,d".format(bd.daysSince)} days ago ${bd.icon}"
+                setTextColor(accentColor); textSize = 11f; letterSpacing = 0.05f
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(6) }
+            })
+            addView(TextView(ctx).apply {
+                text = bd.label
+                setTextColor(textColor); textSize = 15f
+                setTypeface(typeface, Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
+            })
+            addView(TextView(ctx).apply {
+                text = "${bd.label.split(" ").firstOrNull() ?: bd.label}'s Live Age: " +
+                       "${bd.years} Years, ${bd.months} Months, ${bd.daysRemainder} Days"
+                setTextColor(text2Color); textSize = 12f
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(8) }
+            })
+            // Divider
+            addView(View(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(MP, dp(1)).apply { bottomMargin = dp(8) }
+                setBackgroundColor(Color.argb(20, 255, 255, 255))
+            })
+            bd.daysUntilNext?.let { until ->
+                addView(TextView(ctx).apply {
+                    text = "Next Birthday: $until Days"
+                    setTextColor(text3Color); textSize = 11f; letterSpacing = 0.05f
+                    layoutParams = LinearLayout.LayoutParams(MP, WC)
+                })
+            }
+        }
+    }
+
+    private fun buildAnniversaryCard(
+        ctx: Context, ann: DateEntry,
+        accentColor: Int, bg1Color: Int,
+        textColor: Int, text3Color: Int
+    ): View {
+        val MP = ViewGroup.LayoutParams.MATCH_PARENT
+        val WC = ViewGroup.LayoutParams.WRAP_CONTENT
+        val circleSize = dp(76)
+        val lbl  = if (ann.years >= 1) "${ann.years}y" else "${ann.daysSince}d"
+        val prog = (ann.daysSince % 365).toFloat() / 365f
+
+        return LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(12), dp(16), dp(12), dp(16))
+            background = cardBackground(bg1Color)
+
+            addView(buildCircleRing(ctx, circleSize, prog, accentColor, lbl, ann.label, textColor).apply {
+                layoutParams = LinearLayout.LayoutParams(WC, WC).apply { gravity = Gravity.CENTER_HORIZONTAL }
+            })
+            ann.daysUntilNext?.let { until ->
+                addView(View(ctx).apply {
+                    layoutParams = LinearLayout.LayoutParams(MP, dp(1)).apply { topMargin = dp(10); bottomMargin = dp(8) }
+                    setBackgroundColor(Color.argb(20, 255, 255, 255))
+                })
+                addView(TextView(ctx).apply {
+                    text = "Next: $until d"
+                    setTextColor(text3Color); textSize = 9f; gravity = Gravity.CENTER
+                    layoutParams = LinearLayout.LayoutParams(MP, WC)
+                })
+            }
+        }
+    }
+
+    private fun buildMilestoneCard(
+        ctx: Context, ms: DateEntry,
+        accentColor: Int, bg1Color: Int,
+        textColor: Int, text2Color: Int, text3Color: Int
+    ): View {
+        val MP   = ViewGroup.LayoutParams.MATCH_PARENT
+        val WC   = ViewGroup.LayoutParams.WRAP_CONTENT
+        val prog = (ms.daysSince % 365).toFloat() / 365f
+
+        return LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = cardBackground(bg1Color)
+
+            addView(TextView(ctx).apply {
+                text = "${ms.label}:"
+                setTextColor(text2Color); textSize = 11f; letterSpacing = 0.05f
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
+            })
+            addView(TextView(ctx).apply {
+                text = "${"%,d".format(ms.daysSince)} Days Ago"
+                setTextColor(textColor); textSize = 22f
+                setTypeface(typeface, Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(12) }
+            })
+            // Progress bar
+            addView(LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(MP, WC)
+                addView(View(ctx).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, dp(4), prog).apply { marginEnd = dp(1) }
+                    background = GradientDrawable().apply { setColor(accentColor); cornerRadius = dp(2).toFloat() }
+                })
+                addView(View(ctx).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, dp(4), 1f - prog)
+                    background = GradientDrawable().apply {
+                        setColor(Color.argb(30, 255, 255, 255)); cornerRadius = dp(2).toFloat()
+                    }
+                })
+                addView(TextView(ctx).apply {
+                    text = "  " + ms.daysSince.toString().map { it }.joinToString(" ")
+                    setTextColor(text3Color); textSize = 10f; setTypeface(typeface, Typeface.BOLD)
+                    layoutParams = LinearLayout.LayoutParams(WC, WC).apply { marginStart = dp(8) }
+                })
+            })
+        }
+    }
+
+    // ── Widgets ───────────────────────────────────────────────────────────────
+
+    private fun buildCircleRing(
+        ctx: Context, sizePx: Int, progress: Float,
+        accentColor: Int, centerText: String, label: String, textColor: Int
+    ): View {
+        val strokeW  = sizePx * 0.13f
+        val clamped  = progress.coerceIn(0f, 1f)
+        val bgPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; strokeWidth = strokeW
+            color = Color.argb(40, 255, 255, 255); strokeCap = Paint.Cap.ROUND
+        }
+        val fgPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; strokeWidth = strokeW
+            color = accentColor; strokeCap = Paint.Cap.ROUND
+        }
+        val txtPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER; color = textColor
+            textSize = sizePx * 0.20f
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+        }
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(sizePx + dp(8), ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+        container.addView(object : View(ctx) {
+            init { layoutParams = ViewGroup.LayoutParams(sizePx, sizePx) }
+            override fun onDraw(canvas: Canvas) {
+                val cx = width / 2f; val cy = height / 2f
+                val r  = (width - strokeW) / 2f - 2f
+                canvas.drawCircle(cx, cy, r, bgPaint)
+                canvas.drawArc(RectF(cx - r, cy - r, cx + r, cy + r), -90f, clamped * 360f, false, fgPaint)
+                canvas.drawText(centerText, cx, cy + txtPaint.textSize * 0.35f, txtPaint)
+            }
+        })
+        container.addView(TextView(ctx).apply {
+            text = label
+            setTextColor(Color.argb(160, Color.red(textColor), Color.green(textColor), Color.blue(textColor)))
+            textSize = 9f; gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(3) }
+        })
+        return container
+    }
+
+    private fun buildUnlockSlider(ctx: Context, accentColor: Int, text3Color: Int): View {
+        val MP = ViewGroup.LayoutParams.MATCH_PARENT
+        val WC = ViewGroup.LayoutParams.WRAP_CONTENT
+        return LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { topMargin = dp(12); bottomMargin = dp(12) }
+            addView(View(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(0, dp(1), 1f)
+                setBackgroundColor(Color.argb(50, 255, 255, 255))
+            })
+            addView(FrameLayout(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(80), dp(36)).apply { marginStart = dp(8) }
+                background = GradientDrawable().apply { setColor(accentColor); cornerRadius = dp(8).toFloat() }
+                addView(TextView(ctx).apply {
+                    text = "⚡"; gravity = Gravity.CENTER; textSize = 18f
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                })
+            })
+            addView(View(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(6), dp(20)).apply { marginStart = dp(8) }
+                background = GradientDrawable().apply { setColor(text3Color); cornerRadius = dp(3).toFloat() }
+            })
+        }
+    }
+
+    private fun buildPill(ctx: Context, textStr: String, textColor: Int): View =
+        TextView(ctx).apply {
+            text = textStr; setTextColor(textColor); textSize = 10f
             setTypeface(typeface, Typeface.BOLD)
             setPadding(dp(12), dp(6), dp(12), dp(6))
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             background = GradientDrawable().apply {
-                setColor(Color.argb(100, 0, 0, 0))
-                cornerRadius = dp(16).toFloat()
+                setColor(Color.argb(100, 0, 0, 0)); cornerRadius = dp(16).toFloat()
                 setStroke(dp(1), Color.argb(60, 255, 255, 255))
             }
+        }
+
+    private fun buildBatteryWidget(ctx: Context, accentColor: Int): View {
+        val WC = ViewGroup.LayoutParams.WRAP_CONTENT
+        return LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(ctx).apply {
+                text = "$batteryLevel%${if (isCharging) " ⚡" else ""}"
+                setTextColor(Color.WHITE); textSize = 10f; setTypeface(typeface, Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(WC, WC).apply { marginEnd = dp(8) }
+            }.also { batteryText = it })
+            addView(View(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(20), dp(2))
+                setBackgroundColor(Color.argb(120, 255, 255, 255))
+            })
+            val body = FrameLayout(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(45), dp(20)).apply { marginStart = dp(4); marginEnd = dp(4) }
+                background = GradientDrawable().apply {
+                    setStroke(dp(1), Color.argb(150, 255, 255, 255)); cornerRadius = dp(4).toFloat()
+                }
+            }
+            val fill = View(ctx).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    (batteryLevel * (dp(45) - dp(4)) / 100), dp(16)
+                ).apply { gravity = Gravity.START or Gravity.CENTER_VERTICAL; marginStart = dp(2) }
+                background = GradientDrawable().apply { setColor(accentColor); cornerRadius = dp(2).toFloat() }
+            }
+            batteryFillView = fill
+            body.addView(fill); addView(body)
+            addView(View(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(3), dp(8))
+                background = GradientDrawable().apply {
+                    setColor(Color.argb(150, 255, 255, 255)); cornerRadius = dp(1).toFloat()
+                }
+            })
         }
     }
 
     private fun addBackgroundShapes(ctx: Context, root: FrameLayout, variant: String, density: Float) {
         fun dp(v: Int) = (v * density).toInt()
-        val screenW = resources.displayMetrics.widthPixels
-        val screenH = resources.displayMetrics.heightPixels
-
+        val sw = resources.displayMetrics.widthPixels
+        val sh = resources.displayMetrics.heightPixels
         when (variant) {
             "deepForest", "softSage" -> {
-                // Trees / Waves
                 root.addView(View(ctx).apply {
                     layoutParams = FrameLayout.LayoutParams(dp(80), dp(350)).apply {
-                        gravity = Gravity.BOTTOM or Gravity.START
-                        leftMargin = dp(-20); bottomMargin = dp(-50)
+                        gravity = Gravity.BOTTOM or Gravity.START; leftMargin = dp(-20); bottomMargin = dp(-50)
                     }
-                    background = GradientDrawable().apply {
-                        setColor(Color.argb(80, 0, 0, 0))
-                        cornerRadius = dp(40).toFloat()
-                    }
+                    background = GradientDrawable().apply { setColor(Color.argb(80,0,0,0)); cornerRadius = dp(40).toFloat() }
                 })
                 root.addView(View(ctx).apply {
                     layoutParams = FrameLayout.LayoutParams(dp(70), dp(400)).apply {
-                        gravity = Gravity.BOTTOM or Gravity.START
-                        leftMargin = dp(80); bottomMargin = dp(-20)
+                        gravity = Gravity.BOTTOM or Gravity.START; leftMargin = dp(80); bottomMargin = dp(-20)
                     }
-                    background = GradientDrawable().apply {
-                        setColor(Color.argb(100, 0, 0, 0))
-                        cornerRadius = dp(35).toFloat()
-                    }
+                    background = GradientDrawable().apply { setColor(Color.argb(100,0,0,0)); cornerRadius = dp(35).toFloat() }
                 })
             }
-            "midnightStars", "oceanDive" -> {
-                // Central circle
-                root.addView(View(ctx).apply {
-                    val size = (screenW * 0.6).toInt()
-                    layoutParams = FrameLayout.LayoutParams(size, size).apply {
-                        gravity = Gravity.CENTER
-                    }
-                    background = GradientDrawable().apply {
-                        setColor(Color.argb(90, 0, 0, 0))
-                        cornerRadius = (size / 2).toFloat()
-                    }
-                })
-            }
-            "warmEarth" -> {
-                // Large warm circles
-                root.addView(View(ctx).apply {
-                    val size = (screenW * 1.2).toInt()
-                    layoutParams = FrameLayout.LayoutParams(size, size).apply {
-                        gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                        topMargin = (screenH * 0.35).toInt()
-                    }
-                    background = GradientDrawable().apply {
-                        setColor(Color.argb(90, 0, 0, 0))
-                        cornerRadius = (size / 2).toFloat()
-                    }
-                })
-            }
+            "midnightStars", "oceanDive" -> root.addView(View(ctx).apply {
+                val size = (sw * 0.6).toInt()
+                layoutParams = FrameLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER }
+                background = GradientDrawable().apply { setColor(Color.argb(90,0,0,0)); cornerRadius = (size/2).toFloat() }
+            })
+            "warmEarth" -> root.addView(View(ctx).apply {
+                val size = (sw * 1.2).toInt()
+                layoutParams = FrameLayout.LayoutParams(size, size).apply {
+                    gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; topMargin = (sh * 0.35).toInt()
+                }
+                background = GradientDrawable().apply { setColor(Color.argb(90,0,0,0)); cornerRadius = (size/2).toFloat() }
+            })
         }
-    }
-
-    private fun buildBatteryWidget(ctx: Context, density: Float, accentColor: Int): View {
-        fun dp(v: Int) = (v * density).toInt()
-        val layout = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        // Battery text
-        batteryText = TextView(ctx).apply {
-            text = "100%"
-            setTextColor(Color.WHITE)
-            textSize = 10f
-            setTypeface(typeface, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { marginEnd = dp(8) }
-        }
-        layout.addView(batteryText)
-
-        // Cable
-        layout.addView(View(ctx).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(20), dp(2))
-            setBackgroundColor(Color.argb(120, 255, 255, 255))
-        })
-        // Battery body
-        val body = FrameLayout(ctx).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(45), dp(20)).apply { marginStart = dp(4); marginEnd = dp(4) }
-            background = GradientDrawable().apply {
-                setStroke(dp(1), Color.argb(150, 255, 255, 255))
-                cornerRadius = dp(4).toFloat()
-            }
-        }
-        val fill = View(ctx).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(41), dp(16)).apply { 
-                gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                marginStart = dp(2)
-            }
-            background = GradientDrawable().apply {
-                setColor(accentColor)
-                cornerRadius = dp(2).toFloat()
-            }
-        }
-        batteryFillView = fill
-        body.addView(fill)
-        layout.addView(body)
-        
-        // Nub
-        layout.addView(View(ctx).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(3), dp(8))
-            background = GradientDrawable().apply {
-                setColor(Color.argb(150, 255, 255, 255))
-                cornerRadius = dp(1).toFloat()
-            }
-        })
-        return layout
-    }
-
-    private fun buildDateCard(
-        ctx: Context, density: Float,
-        label: String, dateISO: String, type: String,
-        bgColor: Int, textColor: Int, text2Color: Int, text3Color: Int, accentColor: Int
-    ): View {
-        fun dp(v: Int) = (v * density).toInt()
-
-        val cal   = Calendar.getInstance()
-        val parts = dateISO.split("-", "T")
-        if (parts.size >= 3) {
-            cal.set(
-                parts[0].toInt(),
-                parts[1].toInt() - 1,
-                parts[2].substring(0, minOf(2, parts[2].length)).toInt()
-            )
-        }
-
-        val now       = Calendar.getInstance()
-        val daysSince = TimeUnit.MILLISECONDS.toDays(now.timeInMillis - cal.timeInMillis)
-        var years     = now.get(Calendar.YEAR)  - cal.get(Calendar.YEAR)
-        var months    = now.get(Calendar.MONTH) - cal.get(Calendar.MONTH)
-        if (months < 0) { years--; months += 12 }
-
-        val card = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(12) }
-            background = GradientDrawable().apply {
-                setColor(Color.argb(30, 0, 0, 0)) // Translucent black
-                cornerRadius = dp(24).toFloat()
-                setStroke(dp(1), Color.argb(25, 255, 255, 255)) // Subtle border
-            }
-        }
-
-        // Label row
-        card.addView(TextView(ctx).apply {
-            text = label
-            setTextColor(textColor)
-            textSize = 15f
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        })
-        card.addView(TextView(ctx).apply {
-            text = "${years}y ${months}m ${daysSince % 30}d old"
-            setTextColor(text2Color)
-            textSize = 12f
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(8) }
-        })
-
-        // Progress row (approximation of ring)
-        val progressContainer = LinearLayout(ctx).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        progressContainer.addView(View(ctx).apply {
-            layoutParams = LinearLayout.LayoutParams(0, dp(4), 1f).apply { marginEnd = dp(8) }
-            background = GradientDrawable().apply {
-                setColor(Color.argb(40, 255, 255, 255))
-                cornerRadius = dp(2).toFloat()
-            }
-        })
-        progressContainer.addView(TextView(ctx).apply {
-            text = String.format("%,d DAYS", daysSince)
-            setTextColor(accentColor)
-            textSize = 10f
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
-        })
-        card.addView(progressContainer)
-
-        return card
     }
 
     private fun parseColor(hex: String?, fallback: String): Int =
         try { Color.parseColor(hex) } catch (_: Exception) { Color.parseColor(fallback) }
-
-    private fun adjustAlpha(color: Int, factor: Float): Int {
-        val alpha = (Color.alpha(color) * factor).toInt().coerceIn(0, 255)
-        return Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
-    }
 }
