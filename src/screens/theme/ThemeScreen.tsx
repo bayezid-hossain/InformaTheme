@@ -79,19 +79,21 @@ export function ThemeScreen() {
                   className="rounded-2xl p-4 mb-3"
                   style={{
                     width: '48%',
-                    backgroundColor: isActive ? optColors.accentDim : optColors.bg2,
+                    backgroundColor: isActive ? colors.accentDim : colors.bg2,
                     borderWidth: 2,
-                    borderColor: isActive ? optColors.accent : colors.border
+                    borderColor: isActive ? colors.accent : colors.border
                   }}
                 >
-                  <View className="flex-row gap-1 mb-2">
-                    <View className="w-4 h-4 rounded-full" style={{ backgroundColor: optColors.bg }} />
-                    <View className="w-4 h-4 rounded-full" style={{ backgroundColor: optColors.accent }} />
-                    <View className="w-4 h-4 rounded-full" style={{ backgroundColor: optColors.text }} />
+                  <View className="flex-row gap-1.5 mb-2.5">
+                    <View className="w-4 h-4 rounded-full border" style={{ backgroundColor: optColors.bg, borderColor: optColors.border || colors.border }} />
+                    <View className="w-4 h-4 rounded-full border" style={{ backgroundColor: optColors.accent, borderColor: 'transparent' }} />
+                    <View className="w-4 h-4 rounded-full border" style={{ backgroundColor: optColors.text, borderColor: 'transparent' }} />
                   </View>
-                  <Text className="font-bold" style={{ color: optColors.text }}>{opt.name}</Text>
-                  {optColors.tagline && (
-                    <Text className="text-[10px] mt-1" style={{ color: optColors.text2 }}>{optColors.tagline}</Text>
+                  <Text className="font-bold text-[14px]" style={{ color: isActive ? colors.accent : colors.text }}>{opt.name}</Text>
+                  {optColors.tagline ? (
+                    <Text className="text-[10px] mt-1" style={{ color: colors.text2 }}>{optColors.tagline}</Text>
+                  ) : (
+                    <Text className="text-[10px] mt-1" style={{ color: colors.text3 }}>Pre-configured</Text>
                   )}
                 </TouchableOpacity>
               );

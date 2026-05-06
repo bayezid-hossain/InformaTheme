@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState, NativeModules } from 'react-native';
 import { ThemeColors } from '../theme/colors';
 import { AnchorDate } from './useDateStore';
+import { totalDays, nextEventCountdown } from '../utils/dateCalc';
 
 const { LockscreenModule } = NativeModules;
 
@@ -26,11 +27,12 @@ export function useOverlay() {
     return () => sub.remove();
   }, [checkStatus]);
 
-  const syncData = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], weather?: string, widgets?: string[]) => {
+  const syncData = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], weather?: string, widgets?: string[], wallpaper?: string, wallpaperFilter?: string) => {
     if (!LockscreenModule?.syncOverlayData) return;
-    console.log('[useOverlay] syncData called with variant:', variant);
+    console.log('[useOverlay] syncData called with variant:', variant, 'wallpaper:', wallpaper, 'filter:', wallpaperFilter);
     setSyncing(true);
     try {
+      const wpName = wallpaper || `wp_${variant.replace(/([A-Z])/g, '_$1').toLowerCase()}`;
       const themeJson = JSON.stringify({
         variant,
         bg: colors.bg,
@@ -41,10 +43,37 @@ export function useOverlay() {
         text2: colors.text2,
         text3: colors.text3,
         tagline: colors.tagline || 'BEST YEARS AHEAD',
-        weather: weather || 'WEATHER 22°C (Bhaluka)',
-        widgets: widgets || ['clock', 'milestone', 'anniversary', 'birthday', 'weather']
+        weather: weather || '',
+        widgets: widgets || ['clock', 'battery', 'milestone', 'anniversary', 'birthday', 'weather'],
+        wallpaper: wpName,
+        wallpaperFilter: wallpaperFilter || 'original',
       });
-      const datesJson = JSON.stringify(dates);
+      const sortedBirthdays = [...dates]
+        .filter(d => d.type === 'birthday')
+        .sort((a, b) => {
+          const daysA = nextEventCountdown(new Date(a.dateISO)).totalDays;
+          const daysB = nextEventCountdown(new Date(b.dateISO)).totalDays;
+          return daysA - daysB; // closest upcoming birthday first
+        });
+
+      const sortedAnniversaries = [...dates]
+        .filter(d => d.type === 'anniversary')
+        .sort((a, b) => {
+          const daysA = nextEventCountdown(new Date(a.dateISO)).totalDays;
+          const daysB = nextEventCountdown(new Date(b.dateISO)).totalDays;
+          return daysA - daysB; // closest upcoming anniversary first
+        });
+
+      const sortedMilestones = [...dates]
+        .filter(d => d.type === 'milestone')
+        .sort((a, b) => {
+          const daysA = totalDays(new Date(a.dateISO));
+          const daysB = totalDays(new Date(b.dateISO));
+          return daysA - daysB; // smallest days elapsed (most recent milestone) first
+        });
+
+      const sortedDates = [...sortedBirthdays, ...sortedAnniversaries, ...sortedMilestones];
+      const datesJson = JSON.stringify(sortedDates);
       await LockscreenModule.syncOverlayData(themeJson, datesJson);
     } catch (e) {
       console.error('[useOverlay] syncData failed:', e);
@@ -52,11 +81,11 @@ export function useOverlay() {
     setSyncing(false);
   }, []);
 
-  const start = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[]) => {
+  const start = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], wallpaper?: string) => {
     if (!LockscreenModule) return;
     try {
       // Sync data first
-      await syncData(variant, colors, dates);
+      await syncData(variant, colors, dates, undefined, undefined, wallpaper);
       // Then start
       await LockscreenModule.startOverlay();
       setActive(true);
@@ -75,11 +104,11 @@ export function useOverlay() {
     }
   }, []);
 
-  const toggle = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[]) => {
+  const toggle = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], wallpaper?: string) => {
     if (active) {
       await stop();
     } else {
-      await start(variant, colors, dates);
+      await start(variant, colors, dates, wallpaper);
     }
   }, [active, start, stop]);
 

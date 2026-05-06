@@ -4,6 +4,7 @@ import { HomeScreen } from '../screens/home/HomeScreen';
 import { DatesScreen } from '../screens/dates/DatesScreen';
 import { WidgetsScreen } from '../screens/widgets/WidgetsScreen';
 import { WallpapersScreen } from '../screens/wallpapers/WallpapersScreen';
+import { WallpaperEditorScreen } from '../screens/wallpapers/WallpaperEditorScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { ThemeScreen } from '../screens/theme/ThemeScreen';
 import { useTheme } from '../hooks/useTheme';
@@ -15,21 +16,29 @@ import { useWidgetStore } from '../hooks/useWidgetStore';
 const Stack = createNativeStackNavigator();
 
 export function AppNavigator() {
-  const { colors, variant } = useTheme();
+  const { colors, variant, customWallpaper, selectedWallpaper } = useTheme();
   const { dates } = useDates();
   const { weather } = useWeather();
   const overlay = useOverlay();
   const { widgets } = useWidgetStore();
- 
-  const weatherStr = `WEATHER ${weather.temp}°C (${weather.location})`;
+
+  const weatherStr = weather.location ? `WEATHER ${weather.temp}°C (${weather.location})` : '';
   const enabledWidgetIdsStr = React.useMemo(() => {
     return widgets.filter(w => w.enabled).map(w => w.id).join(',');
   }, [widgets]);
- 
-  // Sync data globally whenever theme, dates, weather, or widgets change
+
   React.useEffect(() => {
-    overlay.syncData(variant, colors, dates, weatherStr, enabledWidgetIdsStr.split(','));
-  }, [variant, colors, dates, weatherStr, enabledWidgetIdsStr, overlay.syncData]);
+    const wpOverride = customWallpaper ? customWallpaper.uri : (selectedWallpaper ? selectedWallpaper : undefined);
+    const wpFilter = customWallpaper ? customWallpaper.filter : undefined;
+    
+    // Convert preset ID to wp_... format if it's a selectedWallpaper string
+    let finalWp = wpOverride;
+    if (wpOverride && !wpOverride.startsWith('file://') && !wpOverride.startsWith('content://') && !wpOverride.startsWith('/')) {
+        finalWp = `wp_${wpOverride.replace(/([A-Z])/g, '_$1').toLowerCase()}`;
+    }
+
+    overlay.syncData(variant, colors, dates, weatherStr, enabledWidgetIdsStr.split(','), finalWp, wpFilter);
+  }, [variant, colors, dates, weatherStr, enabledWidgetIdsStr, customWallpaper, selectedWallpaper, overlay.syncData]);
 
   return (
     <Stack.Navigator
@@ -44,6 +53,7 @@ export function AppNavigator() {
       <Stack.Screen name="Dates" component={DatesScreen} />
       <Stack.Screen name="Widgets" component={WidgetsScreen} />
       <Stack.Screen name="Wallpapers" component={WallpapersScreen} />
+      <Stack.Screen name="WallpaperEditor" component={WallpaperEditorScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
   );

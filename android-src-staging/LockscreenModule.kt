@@ -72,6 +72,8 @@ class LockscreenModule(private val reactContext: ReactApplicationContext) :
                 .putString("tagline", theme.optString("tagline", "BEST YEARS AHEAD"))
                 .putString("weather", theme.optString("weather", ""))
                 .putString("widgets", theme.optJSONArray("widgets")?.toString() ?: "[\"clock\",\"milestone\",\"anniversary\",\"birthday\",\"weather\"]")
+                .putString("wallpaper", theme.optString("wallpaper", "wp_dark_premium"))
+                .putString("wallpaper_filter", theme.optString("wallpaperFilter", "original"))
                 .putString("dates", datesJson)
                 .apply()
 
@@ -95,6 +97,26 @@ class LockscreenModule(private val reactContext: ReactApplicationContext) :
             true
         }
         promise.resolve(granted)
+    }
+
+    @ReactMethod
+    fun openOverlaySettings(promise: Promise) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:" + reactContext.packageName)
+                ).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                reactContext.startActivity(intent)
+                promise.resolve(true)
+            } else {
+                promise.resolve(false)
+            }
+        } catch (e: Exception) {
+            promise.reject("OVERLAY_ERROR", e.message)
+        }
     }
 
     @ReactMethod

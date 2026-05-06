@@ -1,69 +1,318 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, Image, StyleSheet, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import { TopBar } from '../../components/TopBar';
-import { useTheme } from '../../hooks/useTheme';
-import { Plus, Check } from 'lucide-react-native';
+import { useTheme, themeWallpapers } from '../../hooks/useTheme';
+import { useOverlay } from '../../hooks/useOverlay';
+import { useDates } from '../../context/DateStoreContext';
+import { ThemeVariant } from '../../theme/colors';
+import { getFilterOverlay } from '../../constants/wallpaperFilters';
+import { LockscreenPreview } from '../../components/LockscreenPreview';
+import { Check, RotateCcw, ImagePlus, Trash2, Pencil, Eye, X } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
-const CARD_W = (width - 52) / 2;
+const CARD_W = (width - 42) / 2;
 
-interface Wallpaper { id: string; name: string; color: string; color2: string; }
+interface WallpaperItem {
+  id: ThemeVariant;
+  name: string;
+}
 
-const BUILT_INS: Wallpaper[] = [
-  { id: 'forest', name: 'Forest', color: '#0f1f14', color2: '#1a3a20' },
-  { id: 'night', name: 'Night Sky', color: '#0a0a1a', color2: '#1a1a3a' },
-  { id: 'dawn', name: 'Dawn', color: '#1a0f0a', color2: '#3a2010' },
-  { id: 'arctic', name: 'Arctic', color: '#0a1a2a', color2: '#1a3a4a' },
-  { id: 'moss', name: 'Moss', color: '#141f14', color2: '#2a3a2a' },
-  { id: 'dusk', name: 'Dusk', color: '#1a0a1a', color2: '#3a1a3a' },
+const WALLPAPERS: WallpaperItem[] = [
+  { id: 'darkPremium',    name: 'Dark Premium' },
+  { id: 'warmLight',      name: 'Warm Light' },
+  { id: 'glassmorphism',  name: 'Glassmorphism' },
+  { id: 'deepForest',     name: 'Deep Forest' },
+  { id: 'softSage',       name: 'Soft Sage' },
+  { id: 'midnightStars',  name: 'Midnight Stars' },
+  { id: 'oceanDive',      name: 'Ocean Dive' },
+  { id: 'warmEarth',      name: 'Warm Earth' },
 ];
 
 export function WallpapersScreen() {
-  const { colors } = useTheme();
-  const [active, setActive] = useState('forest');
+  const { colors, variant, selectedWallpaper, setSelectedWallpaper, customWallpaper, setCustomWallpaper } = useTheme();
+  const overlay = useOverlay();
+  const { dates } = useDates();
+  const navigation = useNavigation<any>();
+  const [previewWallpaperId, setPreviewWallpaperId] = useState<ThemeVariant | null>(null);
+
+  const isCustomActive = customWallpaper !== null;
+
+  const handleSelectWallpaper = async (wpId: ThemeVariant | null) => {
+    // Switching to theme wallpaper — clear custom
+    setCustomWallpaper(null);
+    setSelectedWallpaper(wpId);
+    const activeWpKey = wpId || variant;
+    const wpName = `wp_${activeWpKey.replace(/([A-Z])/g, '_$1').toLowerCase()}`;
+    await overlay.syncData(variant, colors, dates, undefined, undefined, wpName);
+  };
+
+  const handlePickFromGallery = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+      allowsEditing: true,
+      aspect: [9, 19.5],
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const { uri, width: imgW, height: imgH } = result.assets[0];
+      navigation.navigate('WallpaperEditor', {
+        imageUri: uri,
+        imageWidth: imgW ?? 1080,
+        imageHeight: imgH ?? 1920,
+      });
+    }
+  };
+
+  const handleRemoveCustom = async () => {
+    setCustomWallpaper(null);
+    const wpKey = selectedWallpaper || variant;
+    const wpName = `wp_${wpKey.replace(/([A-Z])/g, '_$1').toLowerCase()}`;
+    await overlay.syncData(variant, colors, dates, undefined, undefined, wpName);
+  };
+
+  const customFilterOverlay = customWallpaper ? getFilterOverlay(customWallpaper.filter) : null;
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top', 'bottom']}>
       <TopBar title="Wallpapers" />
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, paddingTop: 16 }} showsVerticalScrollIndicator={false}>
-
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, paddingTop: 16 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── From Gallery ── */}
         <TouchableOpacity
-          className="rounded-2xl border-dashed border p-7 items-center mb-6"
+          onPress={handlePickFromGallery}
+          className="rounded-2xl border p-4 flex-row items-center gap-3 mb-3"
           style={{ backgroundColor: colors.bg2, borderColor: colors.border }}
         >
-          <Plus size={32} color={colors.text3} className="mb-2" />
-          <Text className="text-[15px] font-semibold" style={{ color: colors.text2 }}>Upload Custom</Text>
-          <Text className="text-xs mt-1" style={{ color: colors.text3 }}>JPG or PNG</Text>
+          <View className="w-10 h-10 rounded-xl items-center justify-center" style={{ backgroundColor: colors.accentDim }}>
+            <ImagePlus size={20} color={colors.accent} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-[15px] font-bold" style={{ color: colors.text }}>Choose from Gallery</Text>
+            <Text className="text-[11px] mt-0.5" style={{ color: colors.text3 }}>Pick, crop, and filter any photo</Text>
+          </View>
         </TouchableOpacity>
 
-        <Text className="text-[11px] font-bold tracking-[1.2px] mb-3.5" style={{ color: colors.text3 }}>BUILT-IN THEMES</Text>
+        {/* ── Custom Wallpaper Card ── */}
+        {customWallpaper && (
+          <View
+            className="rounded-2xl overflow-hidden mb-5"
+            style={{
+              borderWidth: 2.5,
+              borderColor: colors.accent,
+              elevation: 4,
+              shadowColor: colors.accent,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 6,
+            }}
+          >
+            <View style={{ height: CARD_W * 1.5 }}>
+              <Image source={{ uri: customWallpaper.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              {customFilterOverlay && (
+                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: customFilterOverlay.color, opacity: customFilterOverlay.opacity }]} />
+              )}
+              <View className="absolute top-2 right-2 px-2.5 py-1 rounded-full" style={{ backgroundColor: colors.accent }}>
+                <Text className="text-[10px] font-bold" style={{ color: colors.bg }}>ACTIVE</Text>
+              </View>
+              <View className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60">
+                <Text className="text-[9px] font-bold text-white uppercase">
+                  {customWallpaper.filter === 'original' ? 'No Filter' : customWallpaper.filter}
+                </Text>
+              </View>
+            </View>
+            <View className="px-3 py-2.5 flex-row items-center justify-between" style={{ backgroundColor: colors.bg2 }}>
+              <Text className="text-[13px] font-bold" style={{ color: colors.accent }}>Custom Photo</Text>
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  onPress={handlePickFromGallery}
+                  className="flex-row items-center gap-1 px-3 py-1.5 rounded-lg"
+                  style={{ backgroundColor: colors.bg3 }}
+                >
+                  <Pencil size={12} color={colors.text2} />
+                  <Text className="text-[11px] font-bold" style={{ color: colors.text2 }}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleRemoveCustom}
+                  className="flex-row items-center gap-1 px-3 py-1.5 rounded-lg"
+                  style={{ backgroundColor: colors.bg3 }}
+                >
+                  <Trash2 size={12} color="#F87171" />
+                  <Text className="text-[11px] font-bold" style={{ color: '#F87171' }}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
-        <View className="flex-row flex-wrap gap-2.5">
-          {BUILT_INS.map((w) => {
-            const isActive = active === w.id;
+        {/* ── Reset to theme default ── */}
+        <TouchableOpacity
+          onPress={() => handleSelectWallpaper(null)}
+          className="rounded-2xl border p-5 flex-row items-center justify-center mb-6 gap-3"
+          style={{
+            backgroundColor: !isCustomActive && selectedWallpaper === null ? colors.accentDim : colors.bg2,
+            borderColor: !isCustomActive && selectedWallpaper === null ? colors.accent : colors.border,
+          }}
+        >
+          <RotateCcw size={20} color={!isCustomActive && selectedWallpaper === null ? colors.accent : colors.text2} />
+          <View>
+            <Text className="text-[15px] font-bold" style={{ color: !isCustomActive && selectedWallpaper === null ? colors.accent : colors.text }}>
+              Use Active Theme Default
+            </Text>
+            <Text className="text-[11px] mt-0.5" style={{ color: colors.text3 }}>
+              Current: {variant.charAt(0).toUpperCase() + variant.slice(1).replace(/([A-Z])/g, ' $1')}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <Text className="text-[11px] font-bold tracking-[1.2px] mb-3.5 uppercase" style={{ color: colors.text3 }}>
+          PREMIUM WALLPAPERS ({WALLPAPERS.length})
+        </Text>
+
+        <View className="flex-row flex-wrap justify-between gap-y-3.5">
+          {WALLPAPERS.map(w => {
+            const isActive = !isCustomActive && ((selectedWallpaper === null && variant === w.id) || selectedWallpaper === w.id);
+            const isExplicit = !isCustomActive && selectedWallpaper === w.id;
+
             return (
-              <TouchableOpacity
+              <View
                 key={w.id}
-                onPress={() => setActive(w.id)}
-                className="rounded-[14px] overflow-hidden"
-                style={{ width: CARD_W, borderWidth: isActive ? 2 : 1, borderColor: isActive ? colors.accent : colors.border }}
+                className="rounded-[18px] overflow-hidden"
+                style={{
+                  width: CARD_W,
+                  borderWidth: isActive ? 2.5 : 1,
+                  borderColor: isActive ? colors.accent : colors.border,
+                  elevation: isActive ? 4 : 0,
+                  shadowColor: colors.accent,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isActive ? 0.3 : 0,
+                  shadowRadius: 4,
+                }}
               >
-                <View style={{ height: CARD_W * 1.3, backgroundColor: w.color }}>
-                  <View className="absolute bottom-0 left-0 right-0 h-[60%] opacity-60" style={{ backgroundColor: w.color2 }} />
+                <View style={{ height: CARD_W * 1.5, backgroundColor: colors.bg3 }}>
+                  <Image source={themeWallpapers[w.id]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                   {isActive && (
                     <View className="absolute top-2 right-2 w-6 h-6 rounded-full justify-center items-center" style={{ backgroundColor: colors.accent }}>
-                      <Check size={14} color="#000" strokeWidth={3} />
+                      <Check size={14} color="#000" strokeWidth={3.5} />
+                    </View>
+                  )}
+                  {selectedWallpaper === null && !isCustomActive && variant === w.id && (
+                    <View className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60">
+                      <Text className="text-[9px] font-bold text-white uppercase">Theme Default</Text>
+                    </View>
+                  )}
+                  {isExplicit && (
+                    <View className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/60">
+                      <Text className="text-[9px] font-bold text-white uppercase">Custom Set</Text>
                     </View>
                   )}
                 </View>
-                <View className="px-2.5 py-2" style={{ backgroundColor: colors.bg2 }}>
-                  <Text className="text-[13px] font-semibold" style={{ color: isActive ? colors.accent : colors.text }}>{w.name}</Text>
+                <View className="px-2 pb-2.5 pt-1.5" style={{ backgroundColor: colors.bg2 }}>
+                  <Text className="text-[13px] font-bold mb-2 px-1" numberOfLines={1} style={{ color: isActive ? colors.accent : colors.text }}>
+                    {w.name}
+                  </Text>
+                  <View className="flex-row gap-1.5">
+                    <TouchableOpacity
+                      onPress={() => handleSelectWallpaper(w.id)}
+                      className="flex-1 py-1.5 rounded-lg items-center justify-center flex-row gap-1"
+                      style={{ backgroundColor: isActive ? colors.accentDim : colors.accent }}
+                    >
+                      <Check size={11} color={isActive ? colors.accent : colors.bg} strokeWidth={3} />
+                      <Text className="text-[11px] font-extrabold" style={{ color: isActive ? colors.accent : colors.bg }}>
+                        {isActive ? 'Active' : 'Set'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setPreviewWallpaperId(w.id)}
+                      className="flex-1 py-1.5 rounded-lg items-center justify-center flex-row gap-1"
+                      style={{ backgroundColor: colors.bg3 }}
+                    >
+                      <Eye size={11} color={colors.text2} />
+                      <Text className="text-[11px] font-bold" style={{ color: colors.text2 }}>Preview</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </TouchableOpacity>
+              </View>
             );
           })}
         </View>
+
+        {/* Preview Modal */}
+        <Modal
+          visible={previewWallpaperId !== null}
+          transparent={false}
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={() => setPreviewWallpaperId(null)}
+        >
+          <View style={{ flex: 1, backgroundColor: colors.bg }}>
+            {/* Immersive Lockscreen Preview */}
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+              <LockscreenPreview 
+                wallpaperUri={previewWallpaperId ? themeWallpapers[previewWallpaperId] : undefined} 
+                isFullScreen={true}
+              />
+            </View>
+
+            {/* Top Floating Controls */}
+            <SafeAreaView style={{ flex: 0 }} edges={['top']}>
+              <View className="flex-row items-center px-6 pt-4">
+                <View className="flex-1">
+                  <Text className="text-white text-xl font-bold shadow-lg">
+                    {WALLPAPERS.find(w => w.id === previewWallpaperId)?.name}
+                  </Text>
+                  <Text className="text-white/60 text-xs font-medium">Immersive Preview</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setPreviewWallpaperId(null)}
+                  className="w-10 h-10 rounded-full items-center justify-center"
+                  style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+                >
+                  <X size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+
+            {/* Bottom Floating Actions */}
+            <SafeAreaView style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }} edges={['bottom']}>
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.6)']}
+                style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 200 }}
+              />
+              <View className="px-6 pb-8 pt-4 flex-row gap-4">
+                <TouchableOpacity
+                  onPress={() => setPreviewWallpaperId(null)}
+                  className="flex-1 h-14 rounded-2xl items-center justify-center"
+                  style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+                >
+                  <Text className="text-white text-[15px] font-bold">Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (previewWallpaperId) {
+                      await handleSelectWallpaper(previewWallpaperId);
+                      setPreviewWallpaperId(null);
+                    }
+                  }}
+                  className="flex-[2] h-14 rounded-2xl items-center justify-center shadow-xl"
+                  style={{ backgroundColor: colors.accent }}
+                >
+                  <Text className="text-[15px] font-extrabold" style={{ color: colors.bg }}>Set as Lockscreen</Text>
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </View>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );

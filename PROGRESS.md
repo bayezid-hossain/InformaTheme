@@ -2,6 +2,47 @@
 
 ---
 
+## 2026-05-06 — Wallpaper system: device gallery, crop, filters, preview
+
+**Plan:** Implement full custom wallpaper workflow — pick from device gallery, crop to phone aspect ratio, apply color filters, preview on lockscreen, persist selection.
+
+**Steps completed:**
+1. Installed `expo-image-picker` + `expo-image-manipulator` packages.
+2. `src/constants/wallpaperFilters.ts` (new) — 10 filter presets (original/warm/cool/dusk/mono/forest/ocean/night/golden/rose) with color overlay values and `getFilterOverlay()` helper.
+3. `src/hooks/useThemeProvider.ts` — Added `CustomWallpaper` type (`{uri, filter}`), `customWallpaper` state, AsyncStorage persistence via `custom_wallpaper` key, `setCustomWallpaper()` setter.
+4. `src/hooks/useTheme.ts` — Extended `ThemeContextValue` interface with `customWallpaper` + `setCustomWallpaper`.
+5. `src/components/LockscreenPreview.tsx` — Added optional `wallpaperUri` and `filterOverlay` props; renders `Image` instead of `LinearGradient` when URI provided, overlays filter color on top.
+6. `src/screens/wallpapers/WallpaperEditorScreen.tsx` (new) — Three-mode editor: Crop (pan + pinch gesture on image inside fixed 9:19.5 frame), Filter (10 preset thumbnails), Preview (scaled LockscreenPreview). Crop applies via `expo-image-manipulator`. Apply saves to `customWallpaper`.
+7. `src/screens/wallpapers/WallpapersScreen.tsx` — Added "Choose from Gallery" button (launches ImagePicker → WallpaperEditorScreen), custom wallpaper active card with Edit/Remove actions, filter overlay rendered on custom thumbnail.
+8. `src/navigation/AppNavigator.tsx` — Added `WallpaperEditor` stack route; included `customWallpaper.uri` in overlay `syncData` when set (native side will need separate update to load from file path vs assets).
+
+**Deviations:** None.
+
+---
+
+## 2026-05-06 — Native overlay: custom wallpaper file URI + filter rendering + photo permission
+
+**Plan:** Wire the full custom wallpaper pipeline end-to-end: pass filter through JS→native sync, render bitmap from file URI in LockscreenActivity, apply color filter overlay, add media library permission to onboarding + settings.
+
+**Steps completed:**
+1. `src/hooks/useOverlay.ts` — Added `wallpaperFilter?` param to `syncData`; included `wallpaperFilter` key in themeJson.
+2. `src/navigation/AppNavigator.tsx` — Passes `customWallpaper.filter` as 7th arg to `syncData`.
+3. `android-src-staging/LockscreenModule.kt` + `android/.../LockscreenModule.kt` — Stores `wallpaper_filter` from themeJson to SharedPreferences.
+4. `android-src-staging/LockscreenActivity.kt` + `android/.../LockscreenActivity.kt`:
+   - Added imports: `Bitmap`, `BitmapFactory`, `Uri`.
+   - Reads `wallpaper_filter` from SharedPreferences; passes to `buildOverlayView`.
+   - Wallpaper loading: detects `file://` / `content://` / absolute path URIs; loads `Bitmap` via `BitmapFactory.decodeFile` (with `inSampleSize` sampling to screen resolution) or `contentResolver.openInputStream`; falls back to gradient on failure.
+   - Applies reduced dim overlay (alpha 120) + color filter overlay for custom photos.
+   - Asset wallpapers: unchanged behavior (alpha 160 dim, no filter).
+   - Added helpers: `loadBitmapFromUri`, `calcSampleSize`, `filterOverlayColor` (10 filter presets matching JS constants).
+5. `src/hooks/usePermissions.ts` — Added `mediaLibrary` state; checks via `ImagePicker.getMediaLibraryPermissionsAsync()`; added `requestMediaLibrary()`.
+6. `src/screens/onboarding/OnboardingScreen.tsx` — Added photo library permission card (optional, labelled) in the permissions step with Grant/✓ UI.
+7. `src/screens/settings/SettingsScreen.tsx` — Added photo library permission row with `permBadge`, tapping grants permission via `ImagePicker.requestMediaLibraryPermissionsAsync`.
+
+**Deviations:** None.
+
+---
+
 ## 2026-05-05 — Fix lockscreen prevents phone from locking (SCREEN_ON trigger)
 
 **Plan:** Direct `startActivity()` on `SCREEN_OFF` + `FLAG_TURN_SCREEN_ON` caused screen to wake immediately after locking — phone never truly locked. Fix: trigger on `ACTION_SCREEN_ON` instead (screen goes off = phone locks normally; overlay launches when user presses power to wake).

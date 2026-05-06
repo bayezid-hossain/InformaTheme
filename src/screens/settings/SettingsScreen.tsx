@@ -1,18 +1,26 @@
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
+import * as Sharing from 'expo-sharing';
+import { AlertTriangle, Battery, Cloud, Download, Folder, ImagePlus, Info, Lock, MapPin, Palette, PenTool, Share2, Smartphone, User, Zap } from 'lucide-react-native';
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TopBar } from '../../components/TopBar';
-import { useTheme } from '../../hooks/useTheme';
+import { useDates } from '../../context/DateStoreContext';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useTheme } from '../../hooks/useTheme';
 import { useWeather } from '../../hooks/useWeather';
-import * as Location from 'expo-location';
-import { User, Cloud, Lock, Smartphone, Battery, Zap, AlertTriangle, Palette, PenTool, Info, MapPin } from 'lucide-react-native';
+import { loadDatesFromDb } from '../../services/db';
 
 export function SettingsScreen() {
   const { colors, variant } = useTheme();
   const perms = usePermissions();
   const { refresh: refreshWeather } = useWeather();
+  const { persist } = useDates();
   const [locationGranted, setLocationGranted] = React.useState<boolean>(false);
+  const [mediaGranted, setMediaGranted] = React.useState<boolean>(false);
   const themeLabel = {
     darkPremium: 'Dark Premium',
     warmLight: 'Warm Light',
@@ -28,13 +36,77 @@ export function SettingsScreen() {
     Location.getForegroundPermissionsAsync().then(({ status }) => {
       setLocationGranted(status === 'granted');
     });
+    ImagePicker.getMediaLibraryPermissionsAsync().then(({ status }) => {
+      setMediaGranted(status === 'granted');
+    });
   }, []);
 
   async function grantLocation() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     setLocationGranted(status === 'granted');
-    if (status === 'granted') {
-      refreshWeather();
+    if (status === 'granted') refreshWeather();
+  }
+
+  async function grantMedia() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    setMediaGranted(status === 'granted');
+  }
+
+  async function handleBackupToWhatsApp() {
+    try {
+      const dates = loadDatesFromDb();
+      if (dates.length === 0) {
+        Alert.alert('No Data', 'There are no anchor dates to backup.');
+        return;
+      }
+
+      const backupData = JSON.stringify(dates, null, 2);
+      let fileUri = `${FileSystem.cacheDirectory || FileSystem.documentDirectory || ''}informatheme_backup.json`;
+      if (!fileUri.startsWith('file://')) {
+        fileUri = `file://${fileUri}`;
+      }
+
+      await FileSystem.writeAsStringAsync(fileUri, backupData, {
+        encoding: 'utf8',
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Backup InformaTheme Dates',
+          UTI: 'public.json',
+        });
+      } else {
+        Alert.alert('Sharing Unavailable', 'Sharing is not supported on this device.');
+      }
+    } catch (err: any) {
+      Alert.alert('Backup Failed', err.message);
+    }
+  }
+
+  async function handleRestoreBackup() {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const fileUri = result.assets[0].uri;
+      const fileContent = await FileSystem.readAsStringAsync(fileUri);
+      const parsed = JSON.parse(fileContent);
+
+      if (Array.isArray(parsed) && parsed.every(item => item.id && item.label && item.dateISO)) {
+        persist(parsed);
+        Alert.alert('Success', 'Backup restored successfully!');
+      } else {
+        Alert.alert('Invalid Backup', 'The selected file is not a valid InformaTheme backup.');
+      }
+    } catch (err: any) {
+      Alert.alert('Restore Failed', 'Failed to read or parse backup file.');
     }
   }
 
@@ -63,11 +135,10 @@ export function SettingsScreen() {
             <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
           </TouchableOpacity>
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
-          <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
+          <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3" disabled>
             <View className="w-6 items-center"><Cloud size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Cloud Sync</Text>
-            <Text className="text-[13px]" style={{ color: colors.text3 }}>Off</Text>
-            <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
+            <Text className="text-[13px]" style={{ color: colors.text3 }}>Coming Soon</Text>
           </TouchableOpacity>
         </View>
 
@@ -105,6 +176,31 @@ export function SettingsScreen() {
             {permBadge(locationGranted)}
           </TouchableOpacity>
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
+          <TouchableOpacity
+            className="flex-row items-center px-4 py-3.5 gap-3"
+            onPress={() => { if (!mediaGranted) grantMedia(); }}
+          >
+            <View className="w-6 items-center"><ImagePlus size={20} color={colors.text} /></View>
+            <View className="flex-1">
+              <Text className="text-[15px]" style={{ color: colors.text }}>Photo Library</Text>
+              <Text className="text-[11px]" style={{ color: colors.text3 }}>For custom wallpapers</Text>
+            </View>
+            {perms.loading ? (
+              <Text className="text-[13px]" style={{ color: colors.text3 }}>…</Text>
+            ) : permBadge(mediaGranted)}
+          </TouchableOpacity>
+          <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
+          <TouchableOpacity
+            className="flex-row items-center px-4 py-3.5 gap-3"
+            onPress={() => { if (!perms.storage) perms.requestStoragePermission(); }}
+          >
+            <View className="w-6 items-center"><Folder size={20} color={colors.text} /></View>
+            <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Storage Access</Text>
+            {perms.loading ? (
+              <Text className="text-[13px]" style={{ color: colors.text3 }}>…</Text>
+            ) : permBadge(perms.storage)}
+          </TouchableOpacity>
+          <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
           <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
             <View className="w-6 items-center"><Battery size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Battery Optimization</Text>
@@ -116,6 +212,28 @@ export function SettingsScreen() {
             <View className="w-6 items-center"><Zap size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Start on Boot</Text>
             <Text className="text-[13px]" style={{ color: colors.text3 }}>Enabled</Text>
+            <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Backup & Restore */}
+        <Text className="text-[11px] font-bold tracking-[1.2px] mb-2.5 px-1" style={{ color: colors.text3 }}>BACKUP & RESTORE</Text>
+        <View className="rounded-2xl border overflow-hidden mb-6" style={{ backgroundColor: colors.bg2, borderColor: colors.border }}>
+          <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3" onPress={handleBackupToWhatsApp}>
+            <View className="w-6 items-center"><Share2 size={20} color={colors.text} /></View>
+            <View className="flex-1">
+              <Text className="text-[15px]" style={{ color: colors.text }}>Backup dates</Text>
+              <Text className="text-[11px]" style={{ color: colors.text3 }}>Share JSON backup file</Text>
+            </View>
+            <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
+          </TouchableOpacity>
+          <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
+          <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3" onPress={handleRestoreBackup}>
+            <View className="w-6 items-center"><Download size={20} color={colors.text} /></View>
+            <View className="flex-1">
+              <Text className="text-[15px]" style={{ color: colors.text }}>Restore Backup</Text>
+              <Text className="text-[11px]" style={{ color: colors.text3 }}>Import JSON backup file</Text>
+            </View>
             <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
           </TouchableOpacity>
         </View>

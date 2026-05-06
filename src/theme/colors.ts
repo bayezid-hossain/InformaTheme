@@ -14,18 +14,19 @@ export const darkPremium = {
 } as const;
 
 export const warmLight = {
-  bg: '#faf7f2',
-  bg1: '#ffffff',
-  bg2: '#ffffff',
-  bg3: '#f0ede8',
-  accent: '#2d7a4a',
-  accentDim: 'rgba(45,122,74,0.12)',
-  text: '#1a1a1a',
-  text2: '#6b6b6b',
-  text3: '#9a9a9a',
-  border: 'rgba(0,0,0,0.07)',
-  card: 'rgba(0,0,0,0.04)',
-  statusBg: '#faf7f2',
+  bg: '#FDFBF7',
+  bg1: '#FFFFFF',
+  bg2: '#F5F0E6',
+  bg3: '#EBE4D5',
+  accent: '#C2410C',
+  accentDim: 'rgba(194,65,12,0.08)',
+  text: '#1C1917',
+  text2: '#57534E',
+  text3: '#78716C',
+  border: 'rgba(28,25,23,0.08)',
+  card: 'rgba(28,25,23,0.04)',
+  statusBg: '#FDFBF7',
+  tagline: 'WARM SUNLIGHT',
 } as const;
 
 export const glassmorphism = {
@@ -60,19 +61,19 @@ export const deepForest = {
 } as const;
 
 export const softSage = {
-  bg: '#E2E8F0',
-  bg1: '#CBD5E1',
-  bg2: '#94A3B8',
-  bg3: '#64748B',
-  accent: '#4ADE80',
-  accentDim: 'rgba(74,222,128,0.2)',
-  text: '#0F172A',
-  text2: '#334155',
-  text3: '#475569',
-  border: 'rgba(0,0,0,0.1)',
-  card: 'rgba(0,0,0,0.05)',
+  bg: '#F4F7F5',
+  bg1: '#FFFFFF',
+  bg2: '#E6ECE8',
+  bg3: '#D1DDD6',
+  accent: '#15803D',
+  accentDim: 'rgba(21,128,61,0.08)',
+  text: '#14532D',
+  text2: '#166534',
+  text3: '#3F6212',
+  border: 'rgba(20,83,45,0.08)',
+  card: 'rgba(20,83,45,0.04)',
   statusBg: 'transparent',
-  tagline: 'ALL BEST 2025',
+  tagline: 'HERBAL RETREAT',
 } as const;
 
 export const midnightStars = {
@@ -150,4 +151,15 @@ export const themes: Record<ThemeVariant, ThemeColors> = {
   midnightStars,
   oceanDive,
   warmEarth,
+};
+
+export const themeWallpapers: Record<ThemeVariant, any> = {
+  darkPremium: require('../../assets/wallpapers/dark_premium.png'),
+  warmLight: require('../../assets/wallpapers/warm_light.png'),
+  glassmorphism: require('../../assets/wallpapers/glassmorphism.png'),
+  deepForest: require('../../assets/wallpapers/deep_forest.png'),
+  softSage: require('../../assets/wallpapers/soft_sage.png'),
+  midnightStars: require('../../assets/wallpapers/midnight_stars.png'),
+  oceanDive: require('../../assets/wallpapers/ocean_dive.png'),
+  warmEarth: require('../../assets/wallpapers/warm_earth.png'),
 };

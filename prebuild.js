@@ -72,6 +72,49 @@ function ensurePrebuild() {
         console.warn('android-src-staging not found.');
     }
 
+    // 3.5 Sync assets/wallpapers → android/app/src/main/res/drawable/
+    const wallpapersSrcDir = path.join(__dirname, 'assets', 'wallpapers');
+    const drawableDestDir = path.join(__dirname, 'android', 'app', 'src', 'main', 'res', 'drawable');
+    if (fs.existsSync(wallpapersSrcDir)) {
+        if (!fs.existsSync(drawableDestDir)) {
+            fs.mkdirSync(drawableDestDir, { recursive: true });
+        }
+        console.log('Syncing wallpapers to android drawables...');
+        try {
+            fs.readdirSync(wallpapersSrcDir).forEach((file) => {
+                if (file.endsWith('.png')) {
+                    const targetName = file.startsWith('wp_') ? file : `wp_${file}`;
+                    fs.copyFileSync(path.join(wallpapersSrcDir, file), path.join(drawableDestDir, targetName));
+                }
+            });
+            console.log('Wallpapers synced successfully.');
+        } catch (err) {
+            console.error(`Failed to sync wallpapers: ${err.message}`);
+        }
+    } else {
+        console.warn('assets/wallpapers directory not found.');
+    }
+
+    // 3.6 Sync assets/fonts → android/app/src/main/assets/fonts/
+    const fontsSrcDir = path.join(__dirname, 'assets', 'fonts');
+    const fontsDestDir = path.join(__dirname, 'android', 'app', 'src', 'main', 'assets', 'fonts');
+    if (fs.existsSync(fontsSrcDir)) {
+        if (!fs.existsSync(fontsDestDir)) {
+            fs.mkdirSync(fontsDestDir, { recursive: true });
+        }
+        console.log('Syncing fonts to android assets...');
+        try {
+            fs.readdirSync(fontsSrcDir).forEach((file) => {
+                if (file.endsWith('.ttf') || file.endsWith('.otf')) {
+                    fs.copyFileSync(path.join(fontsSrcDir, file), path.join(fontsDestDir, file));
+                }
+            });
+            console.log('Fonts synced successfully.');
+        } catch (err) {
+            console.error(`Failed to sync fonts: ${err.message}`);
+        }
+    }
+
     // 4. Verify namespace in android/app/build.gradle
     const buildGradlePath = path.join(__dirname, 'android', 'app', 'build.gradle');
     if (fs.existsSync(buildGradlePath)) {

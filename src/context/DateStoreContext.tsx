@@ -7,6 +7,7 @@ interface DateStoreContextType {
   addDate: (label: string, dateISO: string, type: DateType) => void;
   deleteDate: (id: string) => void;
   updateDate: (id: string, patch: Partial<Omit<AnchorDate, 'id'>>) => void;
+  persist: (next: AnchorDate[]) => void;
 }
 
 const DateStoreContext = createContext<DateStoreContextType | null>(null);

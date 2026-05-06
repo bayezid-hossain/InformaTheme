@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getJSON, setJSON } from '../services/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadDatesFromDb, saveDateToDb, deleteDateFromDb, updateDateInDb, replaceAllDatesInDb } from '../services/db';
 
 export type DateType = 'birthday' | 'anniversary' | 'milestone';
 
@@ -10,8 +11,6 @@ export interface AnchorDate {
   type: DateType;
   icon: string;
 }
-
-const STORAGE_KEY = 'anchor_dates';
 
 const TYPE_ICONS: Record<DateType, string> = {
   birthday: '🎂',
@@ -30,15 +29,30 @@ export function useDateStore() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    getJSON<AnchorDate[]>(STORAGE_KEY).then((stored) => {
-      setDates(stored ?? DEFAULTS);
-      setLoaded(true);
-    });
+    (async () => {
+      try {
+        const initialized = await AsyncStorage.getItem('db_initialized');
+        const dbRows = loadDatesFromDb();
+        
+        if (initialized === 'true') {
+          setDates(dbRows);
+        } else {
+          // First launch: populate with DEFAULTS in SQLite and mark as initialized
+          replaceAllDatesInDb(DEFAULTS);
+          setDates(DEFAULTS);
+          await AsyncStorage.setItem('db_initialized', 'true');
+        }
+      } catch (err) {
+        console.error('Failed to load or initialize SQLite database:', err);
+      } finally {
+        setLoaded(true);
+      }
+    })();
   }, []);
 
   const persist = useCallback((next: AnchorDate[]) => {
     setDates(next);
-    setJSON(STORAGE_KEY, next);
+    replaceAllDatesInDb(next);
   }, []);
 
   const addDate = useCallback((label: string, dateISO: string, type: DateType) => {
@@ -51,7 +65,7 @@ export function useDateStore() {
     };
     setDates((prev) => {
       const next = [...prev, entry];
-      setJSON(STORAGE_KEY, next);
+      saveDateToDb(entry);
       return next;
     });
   }, []);
@@ -59,7 +73,7 @@ export function useDateStore() {
   const deleteDate = useCallback((id: string) => {
     setDates((prev) => {
       const next = prev.filter((d) => d.id !== id);
-      setJSON(STORAGE_KEY, next);
+      deleteDateFromDb(id);
       return next;
     });
   }, []);
@@ -67,7 +81,7 @@ export function useDateStore() {
   const updateDate = useCallback((id: string, patch: Partial<Omit<AnchorDate, 'id'>>) => {
     setDates((prev) => {
       const next = prev.map((d) => (d.id === id ? { ...d, ...patch } : d));
-      setJSON(STORAGE_KEY, next);
+      updateDateInDb(id, patch);
       return next;
     });
   }, []);

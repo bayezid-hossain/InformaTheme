@@ -1,14 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, Platform } from 'react-native';
-import { Lock, Sprout, Palette, Smartphone, MapPin } from 'lucide-react-native';
+import * as Location from 'expo-location';
+import { Folder, ImagePlus, Lock, MapPin, Palette, Smartphone, Sprout } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePermissions } from '../../hooks/usePermissions';
-import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
 // Each step has its own accent color matching the design
-const STEP_ACCENT = ['#4ADE80', '#2DD4BF', '#A78BFA', '#FB923C'];
+const STEP_ACCENT = [
+  '#4ADE80', // Step 0: Welcome
+  '#2DD4BF', // Step 1: Dates
+  '#A78BFA', // Step 2: Theme
+  '#3B82F6', // Step 3: Overlay Permission
+  '#EC4899', // Step 4: FSI Permission
+  '#F59E0B', // Step 5: Location Permission
+  '#10B981', // Step 6: Photo Library Permission
+  '#6366F1', // Step 7: Storage Permission
+];
 
 const BG = '#0d0f12';
 const CARD_BG = '#1a1e27';
@@ -17,18 +26,18 @@ const TEXT = '#e8ecf2';
 const TEXT2 = '#8892a4';
 const TEXT3 = '#4a5568';
 
-interface Props { 
-  onDone: () => void; 
+interface Props {
+  onDone: () => void;
   initialStep?: number;
 }
 
 export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
   const [step, setStep] = useState(initialStep);
-  const [waiting, setWaiting] = useState<'overlay' | 'fsi' | 'location' | null>(null);
+  const [waiting, setWaiting] = useState<'overlay' | 'fsi' | 'location' | 'media' | 'storage' | null>(null);
   const [locationPerm, setLocationPerm] = useState(false);
   const perms = usePermissions();
   const accent = STEP_ACCENT[step];
-  const isLast = step === 3;
+  const isLast = step === 7;
 
   useEffect(() => {
     (async () => {
@@ -39,10 +48,12 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
 
   // Clear waiting state when the corresponding permission is granted
   useEffect(() => {
-    if (waiting === 'overlay'        && perms.overlay)           setWaiting(null);
-    if (waiting === 'fsi'            && perms.fullScreenIntent)  setWaiting(null);
-    if (waiting === 'location'       && locationPerm)            setWaiting(null);
-  }, [perms.overlay, perms.fullScreenIntent, locationPerm, waiting]);
+    if (waiting === 'overlay' && perms.overlay) setWaiting(null);
+    if (waiting === 'fsi' && perms.fullScreenIntent) setWaiting(null);
+    if (waiting === 'location' && locationPerm) setWaiting(null);
+    if (waiting === 'media' && perms.mediaLibrary) setWaiting(null);
+    if (waiting === 'storage' && perms.storage) setWaiting(null);
+  }, [perms.overlay, perms.fullScreenIntent, perms.mediaLibrary, perms.storage, locationPerm, waiting]);
 
   function grantOverlay() {
     if (perms.overlay) return;
@@ -64,27 +75,73 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
     setWaiting(null);
   }
 
-  const allGranted = perms.overlay && perms.fullScreenIntent && locationPerm;
+  async function grantMedia() {
+    if (perms.mediaLibrary) return;
+    setWaiting('media');
+    await perms.requestMediaLibrary();
+    setWaiting(null);
+  }
+
+  async function grantStorage() {
+    if (perms.storage) return;
+    setWaiting('storage');
+    await perms.requestStoragePermission();
+    setWaiting(null);
+  }
+
+  function isGranted(s: number) {
+    if (s === 3) return perms.overlay;
+    if (s === 4) return perms.fullScreenIntent;
+    if (s === 5) return locationPerm;
+    if (s === 6) return perms.mediaLibrary;
+    if (s === 7) return perms.storage;
+    return false;
+  }
 
   function handleCTA() {
-    if (!isLast) { setStep((s) => s + 1); return; }
-    if (!perms.overlay)          { grantOverlay();       return; }
-    if (!perms.fullScreenIntent) { grantFSI();           return; }
-    if (!locationPerm)           { grantLocation();      return; }
-    onDone();
+    if (step === 0 || step === 1 || step === 2) {
+      setStep((s) => s + 1);
+      return;
+    }
+    if (step === 3) {
+      if (perms.overlay) setStep(4);
+      else grantOverlay();
+      return;
+    }
+    if (step === 4) {
+      if (perms.fullScreenIntent) setStep(5);
+      else grantFSI();
+      return;
+    }
+    if (step === 5) {
+      if (locationPerm) setStep(6);
+      else grantLocation();
+      return;
+    }
+    if (step === 6) {
+      if (perms.mediaLibrary) setStep(7);
+      else grantMedia();
+      return;
+    }
+    if (step === 7) {
+      if (perms.storage) onDone();
+      else grantStorage();
+      return;
+    }
   }
 
   function ctaLabel() {
-    if (!isLast) return step === 0 ? 'Get Started' : 'Continue';
-    if (!allGranted) return 'Grant Permissions';
-    return "Let's Go";
+    if (step === 0) return 'Get Started';
+    if (step === 1 || step === 2) return 'Continue';
+    if (isGranted(step)) return step === 7 ? 'Finish' : 'Continue';
+    return 'Grant Permission';
   }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
       {/* Progress dots */}
       <View style={{ flexDirection: 'row', justifyContent: 'center', paddingTop: 20, gap: 6 }}>
-        {[0, 1, 2, 3].map((i) => (
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
           <View
             key={i}
             style={{
@@ -99,7 +156,7 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
 
       {/* Content area */}
       <View style={{ flex: 1, paddingHorizontal: 32, justifyContent: 'center', alignItems: 'center' }}>
-        {!isLast ? (
+        {step < 3 ? (
           <>
             {/* Icon */}
             <View style={{ marginBottom: 32 }}>
@@ -122,144 +179,102 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
           </>
         ) : (
           <>
-            {/* Grant permissions step */}
-            <Text style={{ fontSize: 28, fontWeight: '800', color: TEXT, textAlign: 'center', marginBottom: 12, lineHeight: 36 }}>
-              Grant Permissions
+            {/* Dedicated Icon Container with outer pulse glow */}
+            <View style={{
+              width: 100,
+              height: 100,
+              borderRadius: 50,
+              backgroundColor: 'rgba(255,255,255,0.02)',
+              borderWidth: 1.5,
+              borderColor: 'rgba(255,255,255,0.06)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 28,
+              shadowColor: accent,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 16,
+              elevation: 4,
+            }}>
+              {step === 3 && <Lock size={44} color={accent} />}
+              {step === 4 && <Smartphone size={44} color={accent} />}
+              {step === 5 && <MapPin size={44} color={accent} />}
+              {step === 6 && <ImagePlus size={44} color={accent} />}
+              {step === 7 && <Folder size={44} color={accent} />}
+            </View>
+
+            {/* Title */}
+            <Text style={{ fontSize: 26, fontWeight: '800', color: TEXT, textAlign: 'center', marginBottom: 12, lineHeight: 34 }}>
+              {step === 3 && 'Display Over Other Apps'}
+              {step === 4 && 'Full Screen Intent'}
+              {step === 5 && 'Location Services'}
+              {step === 6 && 'Photo Library Access'}
+              {step === 7 && 'Storage Access'}
             </Text>
-            <Text style={{ fontSize: 15, color: TEXT2, textAlign: 'center', lineHeight: 24, marginBottom: 32 }}>
-              To show your overlay on the lockscreen, we need two Android permissions. We'll walk you through each one.
+
+            {/* Description */}
+            <Text style={{ fontSize: 14, color: TEXT2, textAlign: 'center', lineHeight: 22, paddingHorizontal: 12, marginBottom: 28 }}>
+              {step === 3 && 'Allows InformaTheme to display your beautiful customized widgets directly on top of your system lockscreen whenever you wake your phone.'}
+              {step === 4 && 'Required by Android to launch and render your lockscreen overlay with native, lag-free performance immediately upon device wake.'}
+              {step === 5 && 'Enables the lockscreen weather widget to retrieve real-time local conditions and temperatures on-device. We never track or share your location.'}
+              {step === 6 && 'Allows you to select, crop, and apply stunning custom filters to your personal gallery photos to use as wallpapers. (Highly recommended!)'}
+              {step === 7 && 'Required to securely export and import your milestones, themes, and settings as JSON backup files, making them easily shareable on WhatsApp.'}
             </Text>
 
-            {/* Overlay permission card */}
+            {/* Premium Status Indicator Card */}
             <View style={{
               width: width - 64,
               backgroundColor: CARD_BG,
               borderRadius: 16,
               borderWidth: 1,
-              borderColor: BORDER,
-              padding: 16,
-              marginBottom: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 12,
-            }}>
-              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: perms.overlay ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' }}>
-                <Lock size={18} color={TEXT} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: TEXT, marginBottom: 2 }}>
-                  Display over other apps
-                </Text>
-                <Text style={{ fontSize: 11, color: TEXT3 }}>
-                  Required for lockscreen overlay
-                </Text>
-              </View>
-              {perms.overlay ? (
-                <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(74,222,128,0.15)' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#4ADE80' }}>✓</Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  onPress={grantOverlay}
-                  style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, backgroundColor: accent }}
-                >
-                  {waiting === 'overlay' ? (
-                    <ActivityIndicator size="small" color="#000" />
-                  ) : (
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#000' }}>Grant</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* FSI permission card */}
-            <View style={{
-              width: width - 64,
-              backgroundColor: CARD_BG,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: BORDER,
+              borderColor: isGranted(step) ? 'rgba(74,222,128,0.2)' : BORDER,
               padding: 16,
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 12,
+              justifyContent: 'space-between',
+              marginBottom: 16,
             }}>
-              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: perms.fullScreenIntent ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' }}>
-                <Smartphone size={18} color={TEXT} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 12 }}>
+                <View style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: isGranted(step) ? 'rgba(74,222,128,0.1)' : 'rgba(255,255,255,0.04)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}>
+                  {step === 3 && <Lock size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
+                  {step === 4 && <Smartphone size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
+                  {step === 5 && <MapPin size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
+                  {step === 6 && <ImagePlus size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
+                  {step === 7 && <Folder size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: TEXT }}>
+                    {isGranted(step) ? 'Permission Granted' : 'Requires Approval'}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: TEXT3, marginTop: 1 }}>
+                    {step === 6 ? 'Optional permission' : 'Required for full features'}
+                  </Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: TEXT, marginBottom: 2 }}>
-                  Full Screen Intent
-                </Text>
-                <Text style={{ fontSize: 11, color: TEXT3 }}>
-                  Required for lockscreen quality
-                </Text>
-              </View>
-              {perms.fullScreenIntent ? (
-                <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(74,222,128,0.15)' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#4ADE80' }}>✓</Text>
+
+              {isGranted(step) ? (
+                <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: 'rgba(74,222,128,0.15)', borderWidth: 1, borderColor: 'rgba(74,222,128,0.25)' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#4ADE80' }}>✓ Active</Text>
                 </View>
               ) : (
-                <TouchableOpacity
-                  onPress={grantFSI}
-                  style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, backgroundColor: accent }}
-                >
-                  {waiting === 'fsi' ? (
-                    <ActivityIndicator size="small" color="#000" />
-                  ) : (
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#000' }}>Grant</Text>
-                  )}
-                </TouchableOpacity>
+                <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: TEXT2 }}>Pending</Text>
+                </View>
               )}
             </View>
 
-            {/* Location permission card */}
-            <View style={{
-              width: width - 64,
-              backgroundColor: CARD_BG,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: BORDER,
-              padding: 16,
-              marginTop: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 12,
-            }}>
-              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: locationPerm ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' }}>
-                <MapPin size={18} color={TEXT} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: TEXT, marginBottom: 2 }}>
-                  Location Services
-                </Text>
-                <Text style={{ fontSize: 11, color: TEXT3 }}>
-                  Required for real-time local weather
-                </Text>
-              </View>
-              {locationPerm ? (
-                <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(74,222,128,0.15)' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#4ADE80' }}>✓</Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  onPress={grantLocation}
-                  style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, backgroundColor: accent }}
-                >
-                  {waiting === 'location' ? (
-                    <ActivityIndicator size="small" color="#000" />
-                  ) : (
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#000' }}>Grant</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* FSI hint if system page not found */}
-            {!perms.fullScreenIntent && (
-              <View style={{ marginTop: 12, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: 'rgba(251,146,60,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(251,146,60,0.2)', width: width - 64 }}>
+            {/* Special Instructions / Hints for FSI */}
+            {step === 4 && !perms.fullScreenIntent && (
+              <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: 'rgba(251,146,60,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(251,146,60,0.2)', width: width - 64 }}>
                 <Text style={{ fontSize: 11, color: '#FB923C', lineHeight: 17, textAlign: 'center' }}>
-                  If the settings page doesn't open automatically, go to{'\n'}
+                  If the settings page doesn't open automatically, go to:{'\n'}
                   <Text style={{ fontWeight: '700' }}>Settings → Apps → InformaTheme → Notifications</Text>
                   {'\n'}and enable "Allow full-screen displays"
                 </Text>

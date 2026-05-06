@@ -13,6 +13,7 @@ const STORAGE_KEY = 'widget_states';
 
 const DEFAULTS: Widget[] = [
   { id: 'clock', name: 'Clock', desc: 'Large stencil digital clock', icon: '🕐', enabled: true },
+  { id: 'battery', name: 'Battery', desc: 'Show battery percentage & charging status', icon: '🔋', enabled: true },
   { id: 'birthday', name: 'Birthday Tracker', desc: 'Days / age countdown to birthdays', icon: '🎂', enabled: true },
   { id: 'anniversary', name: 'Anniversary', desc: 'Circular progress to next anniversary', icon: '💍', enabled: true },
   { id: 'milestone', name: 'Milestone Tracker', desc: 'Days / age since anchor date', icon: '📅', enabled: true },

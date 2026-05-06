@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Platform, Linking, NativeModules, AppState, PermissionsAndroid } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 const { LockscreenModule } = NativeModules;
 const PKG = 'com.informatheme.app';
@@ -8,6 +9,8 @@ export interface PermissionState {
   overlay: boolean;
   fullScreenIntent: boolean;
   notifications: boolean;
+  mediaLibrary: boolean;
+  storage: boolean;
   loading: boolean;
 }
 
@@ -16,12 +19,14 @@ export function usePermissions() {
     overlay: false,
     fullScreenIntent: false,
     notifications: false,
+    mediaLibrary: false,
+    storage: false,
     loading: true,
   });
 
   const check = useCallback(async () => {
     if (Platform.OS !== 'android') {
-      setState({ overlay: true, fullScreenIntent: true, notifications: true, loading: false });
+      setState({ overlay: true, fullScreenIntent: true, notifications: true, mediaLibrary: true, storage: true, loading: false });
       return;
     }
     try {
@@ -31,9 +36,13 @@ export function usePermissions() {
       const notifications = androidVersion >= 33
         ? await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS)
         : true;
-      setState({ overlay, fullScreenIntent: fsi, notifications, loading: false });
+      const { status: mediaStatus } = await ImagePicker.getMediaLibraryPermissionsAsync();
+      const storage = androidVersion >= 33
+        ? true
+        : await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE);
+      setState({ overlay, fullScreenIntent: fsi, notifications, mediaLibrary: mediaStatus === 'granted', storage, loading: false });
     } catch {
-      setState({ overlay: false, fullScreenIntent: false, notifications: false, loading: false });
+      setState({ overlay: false, fullScreenIntent: false, notifications: false, mediaLibrary: false, storage: false, loading: false });
     }
   }, []);
 
@@ -49,9 +58,17 @@ export function usePermissions() {
   }, [check]);
 
   function openOverlaySettings() {
-    Linking.sendIntent('android.settings.action.MANAGE_OVERLAY_PERMISSION', [
-      { key: 'android.provider.extra.APP_PACKAGE', value: PKG },
-    ]).catch(() => Linking.openSettings());
+    if (LockscreenModule?.openOverlaySettings) {
+      LockscreenModule.openOverlaySettings().catch(() => {
+        Linking.sendIntent('android.settings.action.MANAGE_OVERLAY_PERMISSION', [
+          { key: 'android.provider.extra.APP_PACKAGE', value: PKG },
+        ]).catch(() => Linking.openSettings());
+      });
+    } else {
+      Linking.sendIntent('android.settings.action.MANAGE_OVERLAY_PERMISSION', [
+        { key: 'android.provider.extra.APP_PACKAGE', value: PKG },
+      ]).catch(() => Linking.openSettings());
+    }
   }
 
   function openFSISettings() {
@@ -78,10 +95,29 @@ export function usePermissions() {
       PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
     );
     if (result !== PermissionsAndroid.RESULTS.GRANTED) {
-      // Denied or never-ask-again — open settings so user can enable manually
       openNotificationSettings();
     }
     check();
+  }
+
+  async function requestMediaLibrary(): Promise<void> {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    setState((s) => ({ ...s, mediaLibrary: status === 'granted' }));
+  }
+
+  async function requestStoragePermission(): Promise<boolean> {
+    if (Platform.OS !== 'android') return true;
+    const androidVersion = parseInt(Platform.Version.toString(), 10);
+    if (androidVersion >= 33) {
+      setState((s) => ({ ...s, storage: true }));
+      return true;
+    }
+    const result = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE
+    );
+    const granted = result === PermissionsAndroid.RESULTS.GRANTED;
+    setState((s) => ({ ...s, storage: granted }));
+    return granted;
   }
 
   function openNotificationSettings() {
@@ -96,6 +132,8 @@ export function usePermissions() {
     openOverlaySettings,
     openFSISettings,
     requestNotifications,
+    requestMediaLibrary,
+    requestStoragePermission,
     openNotificationSettings,
   };
 }

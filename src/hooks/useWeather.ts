@@ -9,7 +9,7 @@ export interface WeatherData {
 }
 
 export function useWeather() {
-  const [weather, setWeather] = useState<WeatherData>({ temp: 22, condition: 'Clear', location: 'Bhaluka' });
+  const [weather, setWeather] = useState<WeatherData>({ temp: 22, condition: 'Clear', location: '' });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
 
@@ -52,8 +52,8 @@ export function useWeather() {
           location: cityName
         });
       }
-    } catch (e) {
-      console.error('[useWeather] fetch failed:', e);
+    } catch (e: any) {
+      console.warn('[useWeather] fetch failed (network offline/transient drop):', e?.message || e);
     }
   }, []);
 

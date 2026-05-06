@@ -12,12 +12,20 @@ interface Props {
 function pad(n: number) { return n.toString().padStart(2, '0'); }
 
 function useLiveClock() {
-  const now = new Date();
-  const [time, setTime] = useState({ h: pad(now.getHours()), m: pad(now.getMinutes()) });
+  const getFormattedTime = () => {
+    const d = new Date();
+    let hours = d.getHours();
+    const minutes = pad(d.getMinutes());
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    return { h: hours.toString(), m: minutes, ampm };
+  };
+
+  const [time, setTime] = useState(getFormattedTime());
   useEffect(() => {
     const id = setInterval(() => {
-      const d = new Date();
-      setTime({ h: pad(d.getHours()), m: pad(d.getMinutes()) });
+      setTime(getFormattedTime());
     }, 1000);
     return () => clearInterval(id);
   }, []);
@@ -43,11 +51,11 @@ const TRACKING_MAP: Record<ClockStyle, number> = {
 };
 
 export function Clock({ style = 'stencil', color = '#ffffff', size }: Props) {
-  const { h, m } = useLiveClock();
+  const { h, m, ampm } = useLiveClock();
   const fontSize = size ?? SIZE_MAP[style];
 
   return (
-    <View className="items-center">
+    <View className="items-center flex-row">
       <Text
         style={{
           fontFamily: FONT_MAP[style],
@@ -58,6 +66,19 @@ export function Clock({ style = 'stencil', color = '#ffffff', size }: Props) {
         }}
       >
         {h}:{m}
+      </Text>
+      <Text
+        style={{
+          fontFamily: FONT_MAP[style],
+          fontSize: fontSize * 0.25,
+          color,
+          marginLeft: 4,
+          opacity: 0.8,
+          alignSelf: 'flex-end',
+          marginBottom: fontSize * 0.1,
+        }}
+      >
+        {ampm}
       </Text>
     </View>
   );

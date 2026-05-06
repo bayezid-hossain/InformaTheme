@@ -9,7 +9,7 @@ import { useAlert } from '../../hooks/useAlert';
 import { DateType } from '../../hooks/useDateStore';
 import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
 import { useTheme } from '../../hooks/useTheme';
-import { Calendar as CalendarIcon, Cake, Heart, Star } from 'lucide-react-native';
+import { Calendar as CalendarIcon, Cake, Heart, Star, Trash2 } from 'lucide-react-native';
 
 const TYPE_FILTERS = ['All', 'Birthday', 'Anniversary', 'Milestone'] as const;
 const TYPE_ICONS: Record<DateType, React.ReactElement> = { 
@@ -34,7 +34,7 @@ function liveAge(dateISO: string) {
 export function DatesScreen() {
   const { colors } = useTheme();
   const { showAlert } = useAlert();
-  const { dates, addDate, deleteDate, updateDate } = useDates();
+  const { dates, addDate, deleteDate, updateDate, persist } = useDates();
   const isKeyboardVisible = useKeyboardVisible();
   const [filter, setFilter] = useState<typeof TYPE_FILTERS[number]>('All');
   const [showAdd, setShowAdd] = useState(false);
@@ -86,6 +86,13 @@ export function DatesScreen() {
     ]);
   }
 
+  function confirmDeleteAll() {
+    showAlert('Delete All Anchors', 'Are you sure you want to remove ALL your anchor dates? This action cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete All', style: 'destructive', onPress: () => persist([]) },
+    ]);
+  }
+
   // Only apply keyboard avoiding when keyboard is visible — prevents snappy close animation
   const kbBehavior = isKeyboardVisible ? 'padding' : undefined;
 
@@ -94,9 +101,16 @@ export function DatesScreen() {
       <TopBar
         title="Anchor Dates"
         rightElement={
-          <TouchableOpacity onPress={handleStartAdd}>
-            <Text className="text-[26px] font-light" style={{ color: colors.accent }}>+</Text>
-          </TouchableOpacity>
+          <View className="flex-row items-center gap-4">
+            {dates.length > 0 && (
+              <TouchableOpacity onPress={confirmDeleteAll} style={{ padding: 4 }}>
+                <Trash2 size={20} color="#ef4444" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={handleStartAdd} style={{ padding: 4 }}>
+              <Text className="text-[26px] font-light leading-7" style={{ color: colors.accent }}>+</Text>
+            </TouchableOpacity>
+          </View>
         }
       />
 
@@ -159,7 +173,9 @@ export function DatesScreen() {
                 <View className="w-px mx-3" style={{ backgroundColor: colors.border }} />
                 <View className="flex-1 items-center">
                   <Text className="text-lg font-bold" style={{ color: colors.text }}>{liveAge(d.dateISO)}</Text>
-                  <Text className="text-[11px] mt-0.5" style={{ color: colors.text3 }}>live age</Text>
+                  <Text className="text-[11px] mt-0.5" style={{ color: colors.text3 }}>
+                    {d.type === 'birthday' ? 'age' : d.type === 'anniversary' ? 'anniversary' : 'elapsed'}
+                  </Text>
                 </View>
               </View>
             </View>
