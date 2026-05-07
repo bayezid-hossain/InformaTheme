@@ -72,17 +72,11 @@ export function usePermissions() {
   }
 
   function openFSISettings() {
-    Linking.sendIntent('android.settings.action.MANAGE_APP_USE_FULL_SCREEN_INTENT', [
-      { key: 'android.provider.extra.APP_PACKAGE', value: PKG },
-    ]).catch(() =>
-      Linking.sendIntent('android.settings.APP_NOTIFICATION_SETTINGS', [
-        { key: 'android.provider.extra.APP_PACKAGE', value: PKG },
-      ]).catch(() =>
-        Linking.sendIntent('android.settings.APPLICATION_DETAILS_SETTINGS', [
-          { key: 'android.provider.extra.APP_PACKAGE', value: PKG },
-        ]).catch(() => Linking.openSettings()),
-      ),
-    );
+    if (LockscreenModule?.openFSISettings) {
+      LockscreenModule.openFSISettings().catch(() => Linking.openSettings());
+    } else {
+      Linking.openSettings();
+    }
   }
 
   async function requestNotifications(): Promise<void> {

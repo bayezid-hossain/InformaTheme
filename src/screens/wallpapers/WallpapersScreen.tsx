@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import Constants from 'expo-constants';
+import { Asset } from 'expo-asset';
 import { TopBar } from '../../components/TopBar';
 import { useTheme, themeWallpapers } from '../../hooks/useTheme';
 import { useOverlay } from '../../hooks/useOverlay';
@@ -74,27 +74,15 @@ export function WallpapersScreen() {
     }
   };
 
-  const handleEditPreset = (wpId: ThemeVariant) => {
+  const handleEditPreset = async (wpId: ThemeVariant) => {
     const source = themeWallpapers[wpId];
-    const resolved = (require('react-native').Image as any).resolveAssetSource(source);
-    if (!resolved?.uri) return;
-
-    let uri: string = resolved.uri;
-
-    // In dev, Metro serves assets via HTTP. Fix the host for real devices:
-    // resolveAssetSource may return 10.0.2.2 (emulator loopback) even on physical devices.
-    if (uri.startsWith('http')) {
-      const hostUri = (Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.hostUri) as string | undefined;
-      if (hostUri) {
-        const metroHost = hostUri.split(':')[0];
-        uri = uri.replace(/10\.0\.2\.2|localhost|127\.0\.0\.1/g, metroHost);
-      }
-    }
-
+    const asset = Asset.fromModule(source);
+    await asset.downloadAsync();
+    if (!asset.localUri) return;
     navigation.navigate('WallpaperEditor', {
-      imageUri: uri,
-      imageWidth: resolved.width ?? 1080,
-      imageHeight: resolved.height ?? 1920,
+      imageUri: asset.localUri,
+      imageWidth: asset.width ?? 1080,
+      imageHeight: asset.height ?? 1920,
     });
   };
 

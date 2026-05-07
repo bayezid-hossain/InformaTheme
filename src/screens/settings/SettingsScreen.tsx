@@ -7,7 +7,7 @@ import { AlertTriangle, Battery, Cloud, Download, Folder, ImagePlus, Info, Lock,
 import { useNavigation } from '@react-navigation/native';
 import { getFontDef } from '../../constants/fonts';
 import React from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TopBar } from '../../components/TopBar';
 import { useDates } from '../../context/DateStoreContext';
@@ -24,6 +24,10 @@ export function SettingsScreen() {
   const { persist } = useDates();
   const [locationGranted, setLocationGranted] = React.useState<boolean>(false);
   const [mediaGranted, setMediaGranted] = React.useState<boolean>(false);
+  const [restoreData, setRestoreData] = React.useState<any[] | null>(null);
+  const [restoreModalVisible, setRestoreModalVisible] = React.useState<boolean>(false);
+  const [successModal, setSuccessModal] = React.useState<{ visible: boolean; title: string; message: string; type: 'backup' | 'restore' } | null>(null);
+  const [errorModal, setErrorModal] = React.useState<{ visible: boolean; title: string; message: string } | null>(null);
   const themeLabel: Record<string, string> = {
     darkPremium: 'Dark Premium',
     warmLight: 'Warm Light',
@@ -65,7 +69,11 @@ export function SettingsScreen() {
     try {
       const dates = loadDatesFromDb();
       if (dates.length === 0) {
-        Alert.alert('No Data', 'There are no anchor dates to backup.');
+        setErrorModal({
+          visible: true,
+          title: 'No Data',
+          message: 'There are no anchor dates to backup.'
+        });
         return;
       }
 
@@ -85,11 +93,25 @@ export function SettingsScreen() {
           dialogTitle: 'Backup InformaTheme Dates',
           UTI: 'public.json',
         });
+        setSuccessModal({
+          visible: true,
+          title: 'Backup Successful',
+          message: 'Your backup file has been successfully prepared and shared.',
+          type: 'backup'
+        });
       } else {
-        Alert.alert('Sharing Unavailable', 'Sharing is not supported on this device.');
+        setErrorModal({
+          visible: true,
+          title: 'Sharing Unavailable',
+          message: 'Sharing is not supported on this device.'
+        });
       }
     } catch (err: any) {
-      Alert.alert('Backup Failed', err.message);
+      setErrorModal({
+        visible: true,
+        title: 'Backup Failed',
+        message: err.message || 'An unknown error occurred while preparing backup.'
+      });
     }
   }
 
@@ -109,13 +131,21 @@ export function SettingsScreen() {
       const parsed = JSON.parse(fileContent);
 
       if (Array.isArray(parsed) && parsed.every(item => item.id && item.label && item.dateISO)) {
-        persist(parsed);
-        Alert.alert('Success', 'Backup restored successfully!');
+        setRestoreData(parsed);
+        setRestoreModalVisible(true);
       } else {
-        Alert.alert('Invalid Backup', 'The selected file is not a valid InformaTheme backup.');
+        setErrorModal({
+          visible: true,
+          title: 'Invalid Backup',
+          message: 'The selected file is not a valid InformaTheme backup.'
+        });
       }
     } catch (err: any) {
-      Alert.alert('Restore Failed', 'Failed to read or parse backup file.');
+      setErrorModal({
+        visible: true,
+        title: 'Restore Failed',
+        message: 'Failed to read or parse backup file.'
+      });
     }
   }
 
@@ -281,6 +311,113 @@ export function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Restore Preview Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={restoreModalVisible}
+        onRequestClose={() => setRestoreModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+          <View className="w-full max-w-sm rounded-3xl p-5 border" style={{ backgroundColor: colors.bg1, borderColor: colors.border }}>
+            <Text className="text-lg font-bold mb-1" style={{ color: colors.text }}>Restore Backup?</Text>
+            <Text className="text-xs mb-4" style={{ color: colors.text3 }}>Found the following {restoreData?.length} anchor dates to import:</Text>
+            
+            <ScrollView style={{ maxHeight: 200 }} className="mb-5" showsVerticalScrollIndicator={false}>
+              {restoreData?.map((item, idx) => (
+                <View key={idx} className="flex-row items-center py-2 px-3 rounded-xl mb-1.5" style={{ backgroundColor: colors.bg2 }}>
+                  <Text className="text-lg mr-2">{item.type === 'birthday' ? '🎂' : item.type === 'anniversary' ? '💍' : '⭐'}</Text>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold" style={{ color: colors.text }}>{item.label}</Text>
+                    <Text className="text-[10px]" style={{ color: colors.text3 }}>{item.dateISO ? new Date(item.dateISO).toLocaleDateString() : ''}</Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                className="flex-1 py-3 rounded-xl items-center"
+                style={{ backgroundColor: colors.bg3 }}
+                onPress={() => setRestoreModalVisible(false)}
+              >
+                <Text className="text-sm font-bold" style={{ color: colors.text2 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 py-3 rounded-xl items-center"
+                style={{ backgroundColor: colors.accent }}
+                onPress={() => {
+                  if (restoreData) {
+                    persist(restoreData);
+                    setRestoreModalVisible(false);
+                    setSuccessModal({
+                      visible: true,
+                      title: 'Success!',
+                      message: `${restoreData.length} anchor dates restored successfully.`,
+                      type: 'restore'
+                    });
+                  }
+                }}
+              >
+                <Text className="text-sm font-bold" style={{ color: '#000' }}>Restore</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Beautiful Success Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={!!successModal?.visible}
+        onRequestClose={() => setSuccessModal(null)}
+      >
+        <View className="flex-1 justify-center items-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+          <View className="w-full max-w-sm rounded-3xl p-6 border items-center" style={{ backgroundColor: colors.bg1, borderColor: colors.border }}>
+            <View className="w-12 h-12 rounded-full items-center justify-center mb-3" style={{ backgroundColor: `${colors.accent}20` }}>
+              <Text className="text-xl" style={{ color: colors.accent }}>✓</Text>
+            </View>
+            <Text className="text-lg font-bold mb-2" style={{ color: colors.text }}>{successModal?.title}</Text>
+            <Text className="text-sm text-center mb-5" style={{ color: colors.text2 }}>{successModal?.message}</Text>
+            
+            <TouchableOpacity
+              className="w-full py-3 rounded-xl items-center"
+              style={{ backgroundColor: colors.accent }}
+              onPress={() => setSuccessModal(null)}
+            >
+              <Text className="text-sm font-bold" style={{ color: '#000' }}>Awesome!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Beautiful Error Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={!!errorModal?.visible}
+        onRequestClose={() => setErrorModal(null)}
+      >
+        <View className="flex-1 justify-center items-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+          <View className="w-full max-w-sm rounded-3xl p-6 border items-center" style={{ backgroundColor: '#13151a', borderColor: 'rgba(239,68,68,0.25)' }}>
+            <View className="w-12 h-12 rounded-full items-center justify-center mb-3" style={{ backgroundColor: 'rgba(239,68,68,0.15)' }}>
+              <Text className="text-xl font-bold" style={{ color: '#ef4444' }}>✗</Text>
+            </View>
+            <Text className="text-lg font-bold mb-2 text-center" style={{ color: '#ef4444' }}>{errorModal?.title}</Text>
+            <Text className="text-sm text-center mb-5" style={{ color: '#a0aec0' }}>{errorModal?.message}</Text>
+            
+            <TouchableOpacity
+              className="w-full py-3 rounded-xl items-center"
+              style={{ backgroundColor: '#ef4444' }}
+              onPress={() => setErrorModal(null)}
+            >
+              <Text className="text-sm font-bold" style={{ color: '#ffffff' }}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

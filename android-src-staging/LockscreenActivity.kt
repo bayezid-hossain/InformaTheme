@@ -10,6 +10,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -116,6 +117,20 @@ class LockscreenActivity : Activity() {
             setShowWhenLocked(true)
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
+        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+        
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        )
     }
 
     private fun registerReceivers() {
@@ -839,8 +854,8 @@ class LockscreenActivity : Activity() {
         val prog = (ann.daysSince % 365).toFloat() / 365f
 
         // Progress ring on left
-        val ring = buildCircleRing(ctx, ringSize, prog, accentColor, sublabel, "", textColor, catTypeface, catSizeOffset).apply {
-            layoutParams = LinearLayout.LayoutParams(WC, WC).apply { marginEnd = dp(14) }
+        val ring = buildHeartBadge(ctx, ringSize, accentColor, sublabel, catTypeface, catSizeOffset).apply {
+            layoutParams = LinearLayout.LayoutParams(ringSize, ringSize).apply { marginEnd = dp(14) }
         }
         root.addView(ring)
 
@@ -1058,6 +1073,41 @@ class LockscreenActivity : Activity() {
             ).apply { topMargin = dp(3) }
         })
         return container
+    }
+
+    private fun buildHeartBadge(
+        ctx: Context, size: Int, fillColor: Int,
+        label: String, catTypeface: Typeface? = null, catSizeOffset: Int = 0
+    ): View {
+        val heartPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fillColor; style = Paint.Style.FILL }
+        val txtPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = size * 0.22f + catSizeOffset * 1.5f
+            textAlign = Paint.Align.CENTER
+            typeface = catTypeface ?: Typeface.create("sans-serif", Typeface.BOLD)
+        }
+        return object : View(ctx) {
+            init { layoutParams = ViewGroup.LayoutParams(size, size) }
+            override fun onDraw(canvas: Canvas) {
+                val w = width.toFloat(); val h = height.toFloat()
+                canvas.drawPath(heartPath(w, h), heartPaint)
+                val fm = txtPaint.fontMetrics
+                canvas.drawText(label, w / 2f, h * 0.54f - (fm.ascent + fm.descent) / 2f, txtPaint)
+            }
+        }
+    }
+
+    private fun heartPath(w: Float, h: Float): Path {
+        val p = Path()
+        p.moveTo(w * 0.5f, h * 0.88f)
+        p.cubicTo(w * 0.25f, h * 0.70f, 0f, h * 0.50f, 0f, h * 0.32f)
+        p.cubicTo(0f, h * 0.14f, w * 0.18f, h * 0.05f, w * 0.35f, h * 0.12f)
+        p.cubicTo(w * 0.42f, h * 0.15f, w * 0.47f, h * 0.20f, w * 0.5f, h * 0.26f)
+        p.cubicTo(w * 0.53f, h * 0.20f, w * 0.58f, h * 0.15f, w * 0.65f, h * 0.12f)
+        p.cubicTo(w * 0.82f, h * 0.05f, w, h * 0.14f, w, h * 0.32f)
+        p.cubicTo(w, h * 0.50f, w * 0.75f, h * 0.70f, w * 0.5f, h * 0.88f)
+        p.close()
+        return p
     }
 
     private fun buildUnlockSlider(ctx: Context, accentColor: Int, text3Color: Int, variant: String, catTypeface: Typeface? = null, catSizeOffset: Int = 0): View {

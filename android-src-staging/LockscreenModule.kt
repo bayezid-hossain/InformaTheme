@@ -132,6 +132,95 @@ class LockscreenModule(private val reactContext: ReactApplicationContext) :
         promise.resolve(granted)
     }
 
+    @ReactMethod
+    fun openFSISettings(promise: Promise) {
+        try {
+            val ctx = reactContext
+            val pkg = ctx.packageName
+            val sdk = Build.VERSION.SDK_INT
+            val mfr = Build.MANUFACTURER.lowercase(java.util.Locale.ROOT)
+
+            // Android 14+: standard FSI permission page
+            if (sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val intent = Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT").apply {
+                    data = android.net.Uri.fromParts("package", pkg, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ctx.startActivity(intent)
+                promise.resolve("standard")
+                return
+            }
+
+            // OEM-specific for devices where FSI is not in standard notification settings
+            val oemIntent: Intent? = when {
+                mfr.contains("xiaomi") || mfr.contains("redmi") || mfr.contains("poco") ->
+                    tryIntent(Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                        setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+                        putExtra("extra_pkgname", pkg)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                mfr.contains("oppo") || mfr.contains("realme") ->
+                    tryIntent(Intent().apply {
+                        setClassName("com.coloros.safecenter", "com.coloros.privacypermissionsentry.PermissionTopActivity")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }) ?: tryIntent(Intent().apply {
+                        setClassName("com.oppo.safe", "com.oppo.safe.permission.PermissionTopActivity")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                mfr.contains("vivo") ->
+                    tryIntent(Intent().apply {
+                        setClassName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.PurviewTabActivity")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                mfr.contains("huawei") || mfr.contains("honor") ->
+                    tryIntent(Intent().apply {
+                        setClassName("com.huawei.systemmanager", "com.huawei.permissionmanager.ui.MainActivity")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                mfr.contains("meizu") ->
+                    tryIntent(Intent("com.meizu.safe.security.SHOW_APPSEC").apply {
+                        putExtra("packageName", pkg)
+                        setClassName("com.meizu.safe", "com.meizu.safe.security.AppSecActivity")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                else -> null
+            }
+
+            if (oemIntent != null) {
+                ctx.startActivity(oemIntent)
+                promise.resolve("oem")
+                return
+            }
+
+            // Fallback: app notification settings → app details
+            val notifIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, pkg)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            tryIntent(notifIntent)?.let {
+                ctx.startActivity(it)
+                promise.resolve("notification_settings")
+                return
+            }
+            ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = android.net.Uri.fromParts("package", pkg, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+            promise.resolve("app_details")
+        } catch (e: Exception) {
+            promise.reject("FSI_SETTINGS_ERROR", e.message)
+        }
+    }
+
+    private fun tryIntent(intent: Intent): Intent? {
+        return try {
+            @Suppress("DEPRECATION")
+            if (intent.resolveActivity(reactContext.packageManager) != null) intent else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     // ── Debug logs ────────────────────────────────────────────────────────────
 
     @ReactMethod

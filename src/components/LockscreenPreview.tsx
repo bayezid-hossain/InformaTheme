@@ -13,7 +13,6 @@ import { GlassBubble } from './GlassBubble';
 import { HorizontalSlider } from './HorizontalSlider';
 import { MilestoneBubble } from './MilestoneBubble';
 import { MilestoneCard } from './MilestoneCard';
-import { ProgressRing } from './ProgressRing';
 
 import { useBattery } from '../hooks/useBattery';
 import { useWidgetStore } from '../hooks/useWidgetStore';
@@ -47,20 +46,11 @@ function AnniversaryCard({ label, date, accentColor, textColor, text3Color }: An
 
   return (
     <GlassBubble style={{ width: cardWidth, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-      <View style={{ alignItems: 'center' }}>
-        <ProgressRing
-          progress={prog}
-          size={ringSize}
-          strokeWidth={3}
-          color={accentColor}
-          sublabel={sublabel}
-          fontFamily={fontFamily}
-          sizeOffset={sizeOffset}
-          textColor={textColor}
-          sublabelColor={textColor}
-          showHeart={false}
-        />
-        <Heart size={10} color={accentColor} fill={accentColor} style={{ marginTop: 4 }} />
+      <View style={{ width: ringSize, height: ringSize, alignItems: 'center', justifyContent: 'center' }}>
+        <Heart size={ringSize} color={accentColor} fill={accentColor} />
+        <Text style={{ position: 'absolute', color: '#fff', fontSize: 11 + sizeOffset, ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '800' }) }}>
+          {sublabel}
+        </Text>
       </View>
       <View style={{ flex: 1, justifyContent: 'center' }}>
         <Text numberOfLines={1} style={{ fontSize: 13.5 + sizeOffset, color: textColor, ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '700' }) }}>
