@@ -82,7 +82,7 @@ function ensurePrebuild() {
         console.log('Syncing wallpapers to android drawables...');
         try {
             fs.readdirSync(wallpapersSrcDir).forEach((file) => {
-                if (file.endsWith('.png')) {
+                if (file.endsWith('.png') || file.endsWith('.jpg') || file.endsWith('.jpeg')) {
                     const targetName = file.startsWith('wp_') ? file : `wp_${file}`;
                     fs.copyFileSync(path.join(wallpapersSrcDir, file), path.join(drawableDestDir, targetName));
                 }

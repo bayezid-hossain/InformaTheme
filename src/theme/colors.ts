@@ -235,15 +235,15 @@ export const themes: Record<ThemeVariant, ThemeColors> = {
 
 export const themeWallpapers: Record<ThemeVariant, any> = {
   onyxGold: require('../../assets/wallpapers/onyx_gold.jpg'),
-  darkPremium: require('../../assets/wallpapers/dark_premium.png'),
+  darkPremium: require('../../assets/wallpapers/dark_premium.jpg'),
   royalAmethyst: require('../../assets/wallpapers/royal_amethyst.jpg'),
-  midnightStars: require('../../assets/wallpapers/midnight_stars.png'),
+  midnightStars: require('../../assets/wallpapers/midnight_stars.jpg'),
   roseQuartz: require('../../assets/wallpapers/rose_quartz.jpg'),
-  warmLight: require('../../assets/wallpapers/warm_light.png'),
+  warmLight: require('../../assets/wallpapers/warm_light.jpg'),
   cobaltNight: require('../../assets/wallpapers/cobalt_night.jpg'),
-  oceanDive: require('../../assets/wallpapers/ocean_dive.png'),
-  glassmorphism: require('../../assets/wallpapers/glassmorphism.png'),
-  warmEarth: require('../../assets/wallpapers/warm_earth.png'),
-  deepForest: require('../../assets/wallpapers/deep_forest.png'),
-  softSage: require('../../assets/wallpapers/soft_sage.png'),
+  oceanDive: require('../../assets/wallpapers/ocean_dive.jpg'),
+  glassmorphism: require('../../assets/wallpapers/glassmorphism.jpg'),
+  warmEarth: require('../../assets/wallpapers/warm_earth.jpg'),
+  deepForest: require('../../assets/wallpapers/deep_forest.jpg'),
+  softSage: require('../../assets/wallpapers/soft_sage.jpg'),
 };
