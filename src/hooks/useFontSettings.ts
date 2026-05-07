@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontId } from '../constants/fonts';
 
-export type FontCategory = 'clock' | 'birthday' | 'anniversary' | 'milestone' | 'others';
+export type FontCategory = 'clock' | 'birthday' | 'anniversary' | 'milestone' | 'todo' | 'others';
 
 export interface FontSetting {
   fontId: FontId;
@@ -18,6 +18,7 @@ const DEFAULTS: FontSettings = {
   birthday:    { fontId: 'modern',  sizeOffset: 0 },
   anniversary: { fontId: 'modern',  sizeOffset: 0 },
   milestone:   { fontId: 'modern',  sizeOffset: 0 },
+  todo:        { fontId: 'modern',  sizeOffset: 0 },
   others:      { fontId: 'modern',  sizeOffset: 0 },
 };
 
@@ -50,6 +51,7 @@ export function useFontSettings() {
               birthday:    { ...DEFAULTS.birthday,    ...stored.birthday },
               anniversary: { ...DEFAULTS.anniversary, ...stored.anniversary },
               milestone:   { ...DEFAULTS.milestone,   ...stored.milestone },
+              todo:        { ...DEFAULTS.todo,        ...stored.todo },
               others:      { ...DEFAULTS.others,      ...stored.others },
             };
           } catch {}

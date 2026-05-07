@@ -209,10 +209,12 @@ class LockscreenActivity : Activity() {
     // ── Data parsing ──────────────────────────────────────────────────────────
 
     data class DateEntry(
+        val id: String,
         val label: String, val type: String, val icon: String,
         val daysSince: Long, val years: Int, val months: Int,
         val daysRemainder: Int, val daysUntilNext: Int?,
-        val nextMonths: Int, val nextDays: Int, val originalDateStr: String
+        val nextMonths: Int, val nextDays: Int, val originalDateStr: String,
+        val targetTimeMillis: Long
     )
 
     private fun parseDatesJson(json: String): List<DateEntry> {
@@ -221,20 +223,37 @@ class LockscreenActivity : Activity() {
             val arr = JSONArray(json)
             for (i in 0 until arr.length()) {
                 val obj     = arr.getJSONObject(i)
+                val id      = obj.optString("id", "")
                 val label   = obj.optString("label", "")
                 val dateISO = obj.optString("dateISO", "")
                 val type    = obj.optString("type", "milestone")
                 val icon    = obj.optString("icon", "")
                 if (label.isEmpty() || dateISO.isEmpty()) continue
 
-                val cal   = Calendar.getInstance()
-                val parts = dateISO.split("-", "T")
-                if (parts.size >= 3) {
-                    cal.set(parts[0].toInt(), parts[1].toInt() - 1,
-                        parts[2].substring(0, minOf(2, parts[2].length)).toInt())
-                    cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
-                    cal.set(Calendar.SECOND, 0);      cal.set(Calendar.MILLISECOND, 0)
+                val cal = Calendar.getInstance()
+                try {
+                    val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+                        timeZone = TimeZone.getTimeZone("UTC")
+                    }
+                    val cleanISO = dateISO.substring(0, minOf(19, dateISO.length))
+                    val dateObj = sdf.parse(cleanISO)
+                    if (dateObj != null) {
+                        cal.time = dateObj
+                    }
+                } catch (e: Exception) {
+                    val parts = dateISO.split("-", "T")
+                    if (parts.size >= 3) {
+                        cal.set(parts[0].toInt(), parts[1].toInt() - 1,
+                            parts[2].substring(0, minOf(2, parts[2].length)).toInt())
+                        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+                        cal.set(Calendar.SECOND, 0);      cal.set(Calendar.MILLISECOND, 0)
+                    }
                 }
+
+                if (type == "todo" && cal.timeInMillis < System.currentTimeMillis()) {
+                    continue
+                }
+
                 val now       = Calendar.getInstance()
                 val daysSince = TimeUnit.MILLISECONDS.toDays(now.timeInMillis - cal.timeInMillis)
                 var years     = now.get(Calendar.YEAR)  - cal.get(Calendar.YEAR)
@@ -272,8 +291,13 @@ class LockscreenActivity : Activity() {
                 
                 val daysUntilNext = TimeUnit.MILLISECONDS.toDays(next.timeInMillis - now.timeInMillis).toInt()
 
-                val originalDateStr = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(cal.time)
-                result.add(DateEntry(label, type, icon, daysSince, years, months, daysRemainder, daysUntilNext, nextMonths, nextDays, originalDateStr))
+                val originalDateStr = if (type == "todo") {
+                    SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault()).format(cal.time)
+                } else {
+                    SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(cal.time)
+                }
+                
+                result.add(DateEntry(id, label, type, icon, daysSince, years, months, daysRemainder, daysUntilNext, nextMonths, nextDays, originalDateStr, cal.timeInMillis))
             }
         } catch (e: Exception) { Log.e("LockscreenActivity", "parseDatesJson: ${e.message}") }
         return result
@@ -306,7 +330,7 @@ class LockscreenActivity : Activity() {
         if (json.isEmpty()) return result
         try {
             val obj = org.json.JSONObject(json)
-            for (key in listOf("clock", "birthday", "anniversary", "milestone", "others")) {
+            for (key in listOf("clock", "birthday", "anniversary", "milestone", "todo", "others")) {
                 if (obj.has(key)) {
                     val cat = obj.getJSONObject(key)
                     result[key] = FontCategorySetting(
@@ -333,14 +357,16 @@ class LockscreenActivity : Activity() {
             val arr = JSONArray(widgetsJson)
             for (i in 0 until arr.length()) enabledWidgets.add(arr.getString(i))
         } catch (_: Exception) {
-            enabledWidgets.addAll(listOf("clock", "battery", "milestone", "anniversary", "birthday", "weather"))
+            enabledWidgets.addAll(listOf("clock", "battery", "todo", "birthday", "anniversary", "milestone", "weather"))
         }
 
         // Per-category fonts
+        val todoSetting = fontSettingsMap["todo"]     ?: FontCategorySetting()
         val bdSetting  = fontSettingsMap["birthday"]  ?: FontCategorySetting()
         val annSetting = fontSettingsMap["anniversary"] ?: FontCategorySetting()
         val msSetting  = fontSettingsMap["milestone"] ?: FontCategorySetting()
         val otSetting  = fontSettingsMap["others"]    ?: FontCategorySetting()
+        val todoTypeface = loadClockTypeface(todoSetting.fontId)
         val bdTypeface  = loadClockTypeface(bdSetting.fontId)
         val annTypeface = loadClockTypeface(annSetting.fontId)
         val msTypeface  = loadClockTypeface(msSetting.fontId)
@@ -469,9 +495,16 @@ class LockscreenActivity : Activity() {
 
         // Date carousels
         val dates         = parseDatesJson(datesJson)
+        val todos         = dates.filter { it.type == "todo" }
         val birthdays     = dates.filter { it.type == "birthday" }
         val anniversaries = dates.filter { it.type == "anniversary" }
         val milestones    = dates.filter { it.type == "milestone" }
+
+        if (enabledWidgets.contains("todo") && todos.isNotEmpty())
+            content.addView(buildCarousel(
+                todos.mapIndexed { i, it -> buildTodoCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color, variant, i == 0, todoTypeface, todoSetting.sizeOffset) },
+                sizeOffset = todoSetting.sizeOffset
+            ))
 
         if (enabledWidgets.contains("birthday") && birthdays.isNotEmpty())
             content.addView(buildCarousel(
@@ -753,7 +786,11 @@ class LockscreenActivity : Activity() {
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
         titleCol.addView(TextView(ctx).apply {
-            text = "Age: ${bd.years}y ${bd.months}m ${bd.daysRemainder}d"
+            val parts = ArrayList<String>()
+            if (bd.years > 0) parts.add("${bd.years}y")
+            if (bd.months > 0) parts.add("${bd.months}m")
+            if (bd.daysRemainder > 0 || parts.isEmpty()) parts.add("${bd.daysRemainder}d")
+            text = "Age: " + parts.joinToString(" ")
             setTextColor(text2Color); textSize = 11f + catSizeOffset
             if (catTypeface != null) typeface = catTypeface
         })
@@ -879,7 +916,10 @@ class LockscreenActivity : Activity() {
         })
         ann.daysUntilNext?.let { until ->
             details.addView(TextView(ctx).apply {
-                text = "Next: ${ann.nextMonths}m ${ann.nextDays}d ($until d)"
+                val nextParts = ArrayList<String>()
+                if (ann.nextMonths > 0) nextParts.add("${ann.nextMonths}m")
+                if (ann.nextDays > 0 || nextParts.isEmpty()) nextParts.add("${ann.nextDays}d")
+                text = "Next: " + nextParts.joinToString(" ") + " ($until d)"
                 setTextColor(text3Color); textSize = 9.5f + catSizeOffset
                 if (catTypeface != null) typeface = catTypeface
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { topMargin = dp(2) }
@@ -888,6 +928,193 @@ class LockscreenActivity : Activity() {
         root.addView(details)
 
         return root
+    }
+
+    private fun buildTodoCard(
+        ctx: Context, todo: DateEntry,
+        accentColor: Int, bg1Color: Int,
+        textColor: Int, text2Color: Int, text3Color: Int,
+        variant: String,
+        isHighlighted: Boolean = false,
+        catTypeface: Typeface? = null,
+        catSizeOffset: Int = 0
+    ): View {
+        val MP   = ViewGroup.LayoutParams.MATCH_PARENT
+        val WC   = ViewGroup.LayoutParams.WRAP_CONTENT
+
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null, variant == "warmLight" || variant == "softSage")
+        }
+
+        // Calculate precise countdown (months, days, hours, minutes remaining)
+        val diffMs = todo.targetTimeMillis - System.currentTimeMillis()
+        val targetCal = Calendar.getInstance().apply { timeInMillis = todo.targetTimeMillis }
+        val nowCal = Calendar.getInstance()
+        
+        var years = targetCal.get(Calendar.YEAR) - nowCal.get(Calendar.YEAR)
+        var months = targetCal.get(Calendar.MONTH) - nowCal.get(Calendar.MONTH)
+        var days = targetCal.get(Calendar.DAY_OF_MONTH) - nowCal.get(Calendar.DAY_OF_MONTH)
+        var hours = targetCal.get(Calendar.HOUR_OF_DAY) - nowCal.get(Calendar.HOUR_OF_DAY)
+        var mins = targetCal.get(Calendar.MINUTE) - nowCal.get(Calendar.MINUTE)
+
+        if (mins < 0) {
+            hours--
+            mins += 60
+        }
+        if (hours < 0) {
+            days--
+            hours += 24
+        }
+        if (days < 0) {
+            months--
+            val prevMonth = (targetCal.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
+            days += prevMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
+        }
+        if (months < 0) {
+            years--
+            months += 12
+        }
+
+        val totalMonths = years * 12 + months
+
+        val countdownParts = ArrayList<String>()
+        if (totalMonths > 0) countdownParts.add("${totalMonths}mo")
+        if (days > 0) countdownParts.add("${days}d")
+        if (hours > 0) countdownParts.add("${hours}h")
+        if (mins > 0 || countdownParts.isEmpty()) countdownParts.add("${mins}m")
+        val countdownLabel = if (diffMs <= 0) "Expired" else countdownParts.joinToString(" ")
+
+        // Horizontal Row Container (matches React Native style)
+        val rowContainer = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MP, WC)
+        }
+
+        // Left: Beautiful Glass Circle Icon (matches style of ⏳ emoji)
+        val bubble = FrameLayout(ctx).apply {
+            val size = dp(54) + (catSizeOffset * 2)
+            layoutParams = LinearLayout.LayoutParams(size, size).apply { rightMargin = dp(14) }
+            background = GradientDrawable().apply {
+                setColor(Color.argb(20, 255, 255, 255))
+                cornerRadius = size / 2f
+                setStroke(dp(1), Color.argb(25, 255, 255, 255))
+            }
+            addView(TextView(ctx).apply {
+                text = countdownLabel
+                setTextColor(accentColor)
+                textSize = 10f + catSizeOffset
+                gravity = Gravity.CENTER
+                if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
+                setPadding(dp(4), 0, dp(4), 0)
+                layoutParams = FrameLayout.LayoutParams(MP, MP)
+            })
+        }
+        rowContainer.addView(bubble)
+
+        // Right: Vertical Column containing text lines
+        val textCol = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, WC, 1f)
+        }
+
+        // Title/Label
+        textCol.addView(TextView(ctx).apply {
+            text = todo.label
+            setTextColor(textColor)
+            textSize = 13.5f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+
+        // Due: date details
+        textCol.addView(TextView(ctx).apply {
+            text = "Due: " + todo.originalDateStr
+            setTextColor(text2Color)
+            textSize = 11f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.NORMAL)
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { topMargin = dp(2) }
+        })
+
+        rowContainer.addView(textCol)
+        root.addView(rowContainer)
+
+        // Complete Button (centered at bottom)
+        val doneBtn = Button(ctx).apply {
+            text = "✓ Complete"
+            setTextColor(Color.BLACK)
+            textSize = 10.5f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
+            setPadding(dp(16), dp(6), dp(16), dp(6))
+            minHeight = 0
+            minWidth = 0
+            includeFontPadding = false
+            background = GradientDrawable().apply {
+                setColor(accentColor)
+                cornerRadius = dp(8).toFloat()
+            }
+            setOnClickListener {
+                markTodoAsDone(ctx, todo)
+            }
+            layoutParams = LinearLayout.LayoutParams(WC, WC).apply {
+                topMargin = dp(10)
+                gravity = Gravity.CENTER_HORIZONTAL
+            }
+        }
+        root.addView(doneBtn)
+
+        return root
+    }
+
+    private fun markTodoAsDone(ctx: Context, todo: DateEntry) {
+        try {
+            val prefs = ctx.getSharedPreferences(LockscreenService.PREFS_NAME, Context.MODE_PRIVATE)
+            val datesJson = prefs.getString("dates", "[]") ?: "[]"
+            val arr = JSONArray(datesJson)
+            val nextArr = JSONArray()
+            var deletedObj: org.json.JSONObject? = null
+            
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val id = obj.optString("id", "")
+                val label = obj.optString("label", "")
+                if (id == todo.id || (id.isEmpty() && label == todo.label)) {
+                    deletedObj = obj
+                } else {
+                    nextArr.put(obj)
+                }
+            }
+            
+            if (deletedObj != null) {
+                val pendingDeletionsStr = prefs.getString("pending_deletions", "[]") ?: "[]"
+                val pendingArr = JSONArray(pendingDeletionsStr)
+                
+                val nowISO = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }.format(Date())
+                
+                deletedObj.put("deletedAtISO", nowISO)
+                deletedObj.put("createdAtISO", deletedObj.optString("createdAtISO", nowISO))
+                deletedObj.put("status", "completed")
+                
+                pendingArr.put(deletedObj)
+                
+                prefs.edit()
+                    .putString("dates", nextArr.toString())
+                    .putString("pending_deletions", pendingArr.toString())
+                    .apply()
+                
+                refreshUI()
+                
+                ctx.sendBroadcast(Intent("com.informatheme.app.TODO_COMPLETED"))
+                ctx.sendBroadcast(Intent("com.informatheme.app.DATA_UPDATED"))
+            }
+        } catch (e: Exception) {
+            Log.e("LockscreenActivity", "markTodoAsDone error: ${e.message}")
+        }
     }
 
     private fun buildMilestoneCard(
@@ -1007,7 +1234,10 @@ class LockscreenActivity : Activity() {
             gravity = Gravity.END
         })
         rightCol.addView(TextView(ctx).apply {
-            text = "${ms.nextMonths}m ${ms.nextDays}d left"
+            val msParts = ArrayList<String>()
+            if (ms.nextMonths > 0) msParts.add("${ms.nextMonths}m")
+            if (ms.nextDays > 0 || msParts.isEmpty()) msParts.add("${ms.nextDays}d")
+            text = msParts.joinToString(" ") + " left"
             setTextColor(text3Color); textSize = 8.5f + catSizeOffset
             if (catTypeface != null) typeface = catTypeface
             gravity = Gravity.END

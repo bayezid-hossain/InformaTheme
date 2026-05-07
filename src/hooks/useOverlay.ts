@@ -44,12 +44,20 @@ export function useOverlay() {
         text3: colors.text3,
         tagline: colors.tagline || 'BEST YEARS AHEAD',
         weather: weather || '',
-        widgets: widgets || ['clock', 'battery', 'milestone', 'anniversary', 'birthday', 'weather'],
+        widgets: widgets || ['clock', 'battery', 'todo', 'birthday', 'anniversary', 'milestone', 'weather'],
         wallpaper: wpName,
         wallpaperFilter: wallpaperFilter || 'original',
         fontId: fontId || 'stencil',
         fontSettings: fontSettings || null,
       });
+      const sortedTodos = [...dates]
+        .filter(d => d.type === 'todo')
+        .sort((a, b) => {
+          const daysA = nextEventCountdown(new Date(a.dateISO)).totalDays;
+          const daysB = nextEventCountdown(new Date(b.dateISO)).totalDays;
+          return daysA - daysB; // earliest todo first
+        });
+
       const sortedBirthdays = [...dates]
         .filter(d => d.type === 'birthday')
         .sort((a, b) => {
@@ -74,7 +82,7 @@ export function useOverlay() {
           return daysA - daysB; // smallest days elapsed (most recent milestone) first
         });
 
-      const sortedDates = [...sortedBirthdays, ...sortedAnniversaries, ...sortedMilestones];
+      const sortedDates = [...sortedTodos, ...sortedBirthdays, ...sortedAnniversaries, ...sortedMilestones];
       const datesJson = JSON.stringify(sortedDates);
       await LockscreenModule.syncOverlayData(themeJson, datesJson);
     } catch (e) {

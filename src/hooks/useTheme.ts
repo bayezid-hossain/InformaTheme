@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import { darkPremium, warmLight, glassmorphism, ThemeVariant, ThemeColors, themes, themeWallpapers } from '../theme/colors';
+import { onyxGold, darkPremium, warmLight, glassmorphism, ThemeVariant, ThemeColors, themes, themeWallpapers } from '../theme/colors';
 import { CustomWallpaper } from './useThemeProvider';
 import { FontId, DEFAULT_FONT_ID } from '../constants/fonts';
 
@@ -16,8 +16,8 @@ export interface ThemeContextValue {
 }
 
 export const ThemeContext = createContext<ThemeContextValue>({
-  variant: 'darkPremium',
-  colors: darkPremium,
+  variant: 'onyxGold',
+  colors: onyxGold,
   setVariant: () => {},
   selectedWallpaper: null,
   setSelectedWallpaper: () => {},

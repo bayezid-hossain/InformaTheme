@@ -7,7 +7,6 @@ const PKG = 'com.informatheme.app';
 
 export interface PermissionState {
   overlay: boolean;
-  fullScreenIntent: boolean;
   notifications: boolean;
   mediaLibrary: boolean;
   storage: boolean;
@@ -17,7 +16,6 @@ export interface PermissionState {
 export function usePermissions() {
   const [state, setState] = useState<PermissionState>({
     overlay: false,
-    fullScreenIntent: false,
     notifications: false,
     mediaLibrary: false,
     storage: false,
@@ -26,12 +24,11 @@ export function usePermissions() {
 
   const check = useCallback(async () => {
     if (Platform.OS !== 'android') {
-      setState({ overlay: true, fullScreenIntent: true, notifications: true, mediaLibrary: true, storage: true, loading: false });
+      setState({ overlay: true, notifications: true, mediaLibrary: true, storage: true, loading: false });
       return;
     }
     try {
       const overlay = LockscreenModule ? await LockscreenModule.checkOverlayPermission() : false;
-      const fsi     = LockscreenModule ? await LockscreenModule.checkFullScreenIntentPermission() : false;
       const androidVersion = parseInt(Platform.Version.toString(), 10);
       const notifications = androidVersion >= 33
         ? await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS)
@@ -40,9 +37,9 @@ export function usePermissions() {
       const storage = androidVersion >= 33
         ? true
         : await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE);
-      setState({ overlay, fullScreenIntent: fsi, notifications, mediaLibrary: mediaStatus === 'granted', storage, loading: false });
+      setState({ overlay, notifications, mediaLibrary: mediaStatus === 'granted', storage, loading: false });
     } catch {
-      setState({ overlay: false, fullScreenIntent: false, notifications: false, mediaLibrary: false, storage: false, loading: false });
+      setState({ overlay: false, notifications: false, mediaLibrary: false, storage: false, loading: false });
     }
   }, []);
 
@@ -68,14 +65,6 @@ export function usePermissions() {
       Linking.sendIntent('android.settings.action.MANAGE_OVERLAY_PERMISSION', [
         { key: 'android.provider.extra.APP_PACKAGE', value: PKG },
       ]).catch(() => Linking.openSettings());
-    }
-  }
-
-  function openFSISettings() {
-    if (LockscreenModule?.openFSISettings) {
-      LockscreenModule.openFSISettings().catch(() => Linking.openSettings());
-    } else {
-      Linking.openSettings();
     }
   }
 
@@ -124,7 +113,6 @@ export function usePermissions() {
     ...state,
     check,
     openOverlaySettings,
-    openFSISettings,
     requestNotifications,
     requestMediaLibrary,
     requestStoragePermission,

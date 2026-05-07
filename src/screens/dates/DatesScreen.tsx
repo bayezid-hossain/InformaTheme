@@ -9,15 +9,16 @@ import { useAlert } from '../../hooks/useAlert';
 import { DateType } from '../../hooks/useDateStore';
 import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
 import { useTheme } from '../../hooks/useTheme';
-import { Calendar as CalendarIcon, Cake, Heart, Star, Trash2 } from 'lucide-react-native';
+import { Calendar as CalendarIcon, Cake, Heart, Star, Trash2, Hourglass } from 'lucide-react-native';
 
-const TYPE_FILTERS = ['All', 'Birthday', 'Anniversary', 'Milestone'] as const;
+const TYPE_FILTERS = ['All', 'Todo', 'Birthday', 'Anniversary', 'Milestone'] as const;
 const TYPE_ICONS: Record<DateType, React.ReactElement> = { 
+  todo: <Hourglass size={14} />,
   birthday: <Cake size={14} />, 
   anniversary: <Heart size={14} />, 
   milestone: <Star size={14} /> 
 };
-const TYPE_COLOR: Record<DateType, string> = { birthday: '#4ADE80', anniversary: '#F472B6', milestone: '#FBBF24' };
+const TYPE_COLOR: Record<DateType, string> = { todo: '#60A5FA', birthday: '#4ADE80', anniversary: '#F472B6', milestone: '#FBBF24' };
 
 function liveAge(dateISO: string) {
   const date = new Date(dateISO);
@@ -31,6 +32,51 @@ function liveAge(dateISO: string) {
   return `${years}y ${months}m ${days}d`;
 }
 
+function getRemainingTime(dateISO: string) {
+  try {
+    const target = new Date(dateISO);
+    const now = new Date();
+    const diffMs = target.getTime() - now.getTime();
+    if (diffMs <= 0) return 'Expired';
+    
+    let years = target.getFullYear() - now.getFullYear();
+    let months = target.getMonth() - now.getMonth();
+    let days = target.getDate() - now.getDate();
+    let hours = target.getHours() - now.getHours();
+    let mins = target.getMinutes() - now.getMinutes();
+
+    if (mins < 0) {
+      hours--;
+      mins += 60;
+    }
+    if (hours < 0) {
+      days--;
+      hours += 24;
+    }
+    if (days < 0) {
+      months--;
+      const prevMonth = new Date(target.getFullYear(), target.getMonth(), 0);
+      days += prevMonth.getDate();
+    }
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    const totalMonths = years * 12 + months;
+
+    const parts: string[] = [];
+    if (totalMonths > 0) parts.push(`${totalMonths}mo`);
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (mins > 0) parts.push(`${mins}m`);
+
+    return parts.join(' ') || '0m';
+  } catch (e) {
+    return '0m';
+  }
+}
+
 export function DatesScreen() {
   const { colors } = useTheme();
   const { showAlert } = useAlert();
@@ -42,12 +88,17 @@ export function DatesScreen() {
   const [newLabel, setNewLabel] = useState('');
   const [dateValue, setDateValue] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
-  const [newType, setNewType] = useState<DateType>('birthday');
+  const [newType, setNewType] = useState<DateType>('todo');
+  const [showTimePicker, setShowTimePicker] = useState(false);
  
   const filtered = filter === 'All' ? dates : dates.filter((d) => d.type === (filter.toLowerCase() as DateType));
  
   function handleSave() {
     if (!newLabel.trim()) return;
+    if (newType === 'todo' && dateValue < new Date()) {
+      alert('A to-do cannot be scheduled in the past. Please select a future date and time.');
+      return;
+    }
     if (editingDateId) {
       updateDate(editingDateId, {
         label: newLabel.trim(),
@@ -75,7 +126,7 @@ export function DatesScreen() {
     setEditingDateId(null);
     setNewLabel('');
     setDateValue(new Date());
-    setNewType('birthday');
+    setNewType('todo');
     setShowAdd(true);
   }
 
@@ -166,17 +217,37 @@ export function DatesScreen() {
                 </View>
               </View>
               <View className="flex-row border-t pt-3" style={{ borderTopColor: colors.border }}>
-                <View className="flex-1 items-center">
-                  <Text className="text-lg font-bold" style={{ color: colors.text }}>{daysSince.toLocaleString()}</Text>
-                  <Text className="text-[11px] mt-0.5" style={{ color: colors.text3 }}>days since</Text>
-                </View>
-                <View className="w-px mx-3" style={{ backgroundColor: colors.border }} />
-                <View className="flex-1 items-center">
-                  <Text className="text-lg font-bold" style={{ color: colors.text }}>{liveAge(d.dateISO)}</Text>
-                  <Text className="text-[11px] mt-0.5" style={{ color: colors.text3 }}>
-                    {d.type === 'birthday' ? 'age' : d.type === 'anniversary' ? 'anniversary' : 'elapsed'}
-                  </Text>
-                </View>
+                {d.type === 'todo' ? (
+                  <>
+                    <View className="flex-1 items-center">
+                      <Text className="text-lg font-bold" style={{ color: colors.text }}>
+                        {format(new Date(d.dateISO), 'h:mm a')}
+                      </Text>
+                      <Text className="text-[11px] mt-0.5" style={{ color: colors.text3 }}>target time</Text>
+                    </View>
+                    <View className="w-px mx-3" style={{ backgroundColor: colors.border }} />
+                    <View className="flex-1 items-center">
+                      <Text className="text-lg font-bold" style={{ color: colors.accent }}>
+                        {getRemainingTime(d.dateISO)}
+                      </Text>
+                      <Text className="text-[11px] mt-0.5" style={{ color: colors.text3 }}>remaining time</Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View className="flex-1 items-center">
+                      <Text className="text-lg font-bold" style={{ color: colors.text }}>{daysSince.toLocaleString()}</Text>
+                      <Text className="text-[11px] mt-0.5" style={{ color: colors.text3 }}>days since</Text>
+                    </View>
+                    <View className="w-px mx-3" style={{ backgroundColor: colors.border }} />
+                    <View className="flex-1 items-center">
+                      <Text className="text-lg font-bold" style={{ color: colors.text }}>{liveAge(d.dateISO)}</Text>
+                      <Text className="text-[11px] mt-0.5" style={{ color: colors.text3 }}>
+                        {d.type === 'birthday' ? 'age' : d.type === 'anniversary' ? 'anniversary' : 'elapsed'}
+                      </Text>
+                    </View>
+                  </>
+                )}
               </View>
             </View>
           );
@@ -225,19 +296,71 @@ export function DatesScreen() {
                     value={dateValue}
                     mode="date"
                     display="default"
-                    onChange={(_, selectedDate) => {
+                    onChange={(event, selectedDate) => {
                       setShowPicker(false);
-                      if (selectedDate) setDateValue(selectedDate);
+                      if (selectedDate) {
+                        const updated = new Date(dateValue);
+                        updated.setFullYear(selectedDate.getFullYear());
+                        updated.setMonth(selectedDate.getMonth());
+                        updated.setDate(selectedDate.getDate());
+                        
+                        if (newType === 'todo' && updated < new Date()) {
+                          alert('A to-do cannot be scheduled in the past. Automatically adjusting to current time.');
+                          setDateValue(new Date());
+                        } else {
+                          setDateValue(updated);
+                          if (selectedDate > new Date()) {
+                            setNewType('todo');
+                          }
+                        }
+                      }
                     }}
-                    maximumDate={new Date()}
                   />
+                )}
+
+                {newType === 'todo' && (
+                  <>
+                    <Text className="text-xs mb-1.5 mt-3" style={{ color: colors.text3 }}>Time</Text>
+                    <TouchableOpacity
+                      onPress={() => setShowTimePicker(true)}
+                      className="rounded-xl border px-3.5 py-3 mb-1 justify-center"
+                      style={{ backgroundColor: colors.bg2, borderColor: colors.border }}
+                    >
+                      <Text style={{ color: colors.text, fontSize: 15 }}>{format(dateValue, 'h:mm a')}</Text>
+                    </TouchableOpacity>
+
+                    {showTimePicker && (
+                      <DateTimePicker
+                        value={dateValue}
+                        mode="time"
+                        display="default"
+                        onChange={(event, selectedTime) => {
+                          setShowTimePicker(false);
+                          if (selectedTime) {
+                            const updated = new Date(dateValue);
+                            updated.setHours(selectedTime.getHours());
+                            updated.setMinutes(selectedTime.getMinutes());
+                            updated.setSeconds(0);
+                            updated.setMilliseconds(0);
+                            
+                            if (updated < new Date()) {
+                              alert('A to-do cannot be scheduled in the past. Automatically adjusting to current time.');
+                              setDateValue(new Date());
+                            } else {
+                              setDateValue(updated);
+                            }
+                          }
+                        }}
+                      />
+                    )}
+                  </>
                 )}
 
                 <View className="mb-4" />
 
                 <Text className="text-xs mb-1.5" style={{ color: colors.text3 }}>Type</Text>
                 <View className="flex-row gap-2 mb-6">
-                  {(['birthday', 'anniversary', 'milestone'] as DateType[]).map((t) => (
+                  {(['todo', 'birthday', 'anniversary', 'milestone'] as DateType[]).map((t) => (
                     <TouchableOpacity
                       key={t}
                       onPress={() => setNewType(t)}
@@ -245,7 +368,7 @@ export function DatesScreen() {
                       style={{ borderColor: newType === t ? colors.accent : colors.border, backgroundColor: newType === t ? colors.accentDim : 'transparent' }}
                     >
                       {React.cloneElement(TYPE_ICONS[t] as React.ReactElement<any>, { color: newType === t ? colors.accent : colors.text3 })}
-                      <Text className="text-[13px] font-medium" style={{ color: newType === t ? colors.accent : colors.text3 }}>
+                      <Text className="text-[11px] font-medium" style={{ color: newType === t ? colors.accent : colors.text3 }}>
                         {t}
                       </Text>
                     </TouchableOpacity>

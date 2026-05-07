@@ -60,12 +60,99 @@ function AnniversaryCard({ label, date, accentColor, textColor, text3Color }: An
           Since {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </Text>
         <Text style={{ fontSize: 9.5 + sizeOffset, color: text3Color, marginTop: 2, ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '600' }) }}>
-          Next: {next.months}m {next.days}d ({next.totalDays}d)
+          Next: {(() => {
+            const nextParts: string[] = [];
+            if (next.months > 0) nextParts.push(`${next.months}m`);
+            if (next.days > 0 || nextParts.length === 0) nextParts.push(`${next.days}d`);
+            return nextParts.join(' ');
+          })()} ({next.totalDays}d)
         </Text>
       </View>
     </GlassBubble>
   );
 }
+
+interface TodoCardProps {
+  label: string;
+  date: Date;
+  accentColor: string;
+  textColor: string;
+  text2Color: string;
+  text3Color: string;
+}
+
+function TodoCard({ label, date, accentColor, textColor, text2Color, text3Color }: TodoCardProps) {
+  const { settings } = useFontSettings();
+  const font = getFontDef(settings.todo.fontId);
+  const fontFamily = font.fontFamily;
+  const sizeOffset = settings.todo.sizeOffset;
+
+  const getTodoRemainingTime = (target: Date) => {
+    try {
+      const now = new Date();
+      const diffMs = target.getTime() - now.getTime();
+      if (diffMs <= 0) return 'Expired';
+      
+      let years = target.getFullYear() - now.getFullYear();
+      let months = target.getMonth() - now.getMonth();
+      let days = target.getDate() - now.getDate();
+      let hours = target.getHours() - now.getHours();
+      let mins = target.getMinutes() - now.getMinutes();
+
+      if (mins < 0) {
+        hours--;
+        mins += 60;
+      }
+      if (hours < 0) {
+        days--;
+        hours += 24;
+      }
+      if (days < 0) {
+        months--;
+        const prevMonth = new Date(target.getFullYear(), target.getMonth(), 0);
+        days += prevMonth.getDate();
+      }
+      if (months < 0) {
+        years--;
+        months += 12;
+      }
+
+      const totalMonths = years * 12 + months;
+
+      const parts: string[] = [];
+      if (totalMonths > 0) parts.push(`${totalMonths}mo`);
+      if (days > 0) parts.push(`${days}d`);
+      if (hours > 0) parts.push(`${hours}h`);
+      if (mins > 0) parts.push(`${mins}m`);
+
+      return parts.join(' ') || '0m';
+    } catch (e) {
+      return '0m';
+    }
+  };
+
+  const cardWidth = 260 + sizeOffset * 8;
+  const ringSize = 54 + sizeOffset * 2;
+
+  return (
+    <GlassBubble style={{ width: cardWidth, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <View style={{ width: ringSize, height: ringSize, borderRadius: ringSize / 2, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+        <Text numberOfLines={1} style={{ fontSize: 10 + sizeOffset, color: accentColor, fontWeight: '800', textAlign: 'center', paddingHorizontal: 4, ...(fontFamily ? { fontFamily } : {}) }}>
+          {getTodoRemainingTime(date)}
+        </Text>
+      </View>
+      <View style={{ flex: 1, justifyContent: 'center' }}>
+        <Text numberOfLines={1} style={{ fontSize: 13.5 + sizeOffset, color: textColor, ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '700' }) }}>
+          {label}
+        </Text>
+        <Text style={{ fontSize: 11 + sizeOffset, color: text2Color, marginTop: 2, ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '600' }) }}>
+          Due: {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </Text>
+      </View>
+    </GlassBubble>
+  );
+}
+
 
 interface LockscreenPreviewProps {
   wallpaperUri?: string | number;
@@ -90,6 +177,14 @@ export function LockscreenPreview({ wallpaperUri, filterOverlay, isFullScreen = 
   const tagline = colors.tagline || 'BEST YEARS AHEAD';
   const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'short', month: '2-digit', day: '2-digit' }).replace(',', '').toUpperCase();
   const taglineText = `${todayDate} ▼ ${tagline} ▼`;
+
+  const todos = [...dates]
+    .filter(d => d.type === 'todo')
+    .sort((a, b) => {
+      const daysA = nextEventCountdown(new Date(a.dateISO)).totalDays;
+      const daysB = nextEventCountdown(new Date(b.dateISO)).totalDays;
+      return daysA - daysB; // earliest todo first
+    });
 
   const birthdays = [...dates]
     .filter(d => d.type === 'birthday')
@@ -159,7 +254,7 @@ export function LockscreenPreview({ wallpaperUri, filterOverlay, isFullScreen = 
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: activeFilter.color, opacity: activeFilter.opacity }]} />
       )}
 
-      <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: isFullScreen ? 60 : 52, paddingBottom: isFullScreen ? 110 : 60 }}>
+      <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: isFullScreen ? (todos.length > 0 ? 44 : 60) : 36, paddingBottom: isFullScreen ? 80 : 44 }}>
 
         {/* Date tagline */}
         {isEnabled('clock') && (
@@ -170,9 +265,26 @@ export function LockscreenPreview({ wallpaperUri, filterOverlay, isFullScreen = 
 
         {/* Clock */}
         {isEnabled('clock') && (
-          <View className="items-center" style={{ marginBottom: 16 }}>
-            <Clock color={colors.text} size={80} />
+          <View className="items-center" style={{ marginBottom: (isEnabled('todo') && todos.length > 0) ? 6 : 16 }}>
+            <Clock color={colors.text} size={(isEnabled('todo') && todos.length > 0) ? 60 : 80} />
           </View>
+        )}
+
+        {/* Todo Slider */}
+        {isEnabled('todo') && todos.length > 0 && (
+          <HorizontalSlider>
+            {todos.map(d => (
+              <TodoCard
+                key={d.id}
+                label={d.label}
+                date={new Date(d.dateISO)}
+                accentColor={colors.accent}
+                textColor={colors.text}
+                text2Color={colors.text2}
+                text3Color={colors.text3}
+              />
+            ))}
+          </HorizontalSlider>
         )}
 
         {/* Birthdays Slider */}

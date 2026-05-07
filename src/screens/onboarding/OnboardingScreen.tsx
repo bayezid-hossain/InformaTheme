@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
-import { Folder, ImagePlus, Lock, MapPin, Palette, Smartphone, Sprout } from 'lucide-react-native';
+import { Folder, ImagePlus, Lock, MapPin, Palette, Sprout } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -13,10 +13,9 @@ const STEP_ACCENT = [
   '#2DD4BF', // Step 1: Dates
   '#A78BFA', // Step 2: Theme
   '#3B82F6', // Step 3: Overlay Permission
-  '#EC4899', // Step 4: FSI Permission
-  '#F59E0B', // Step 5: Location Permission
-  '#10B981', // Step 6: Photo Library Permission
-  '#6366F1', // Step 7: Storage Permission
+  '#F59E0B', // Step 4: Location Permission
+  '#10B981', // Step 5: Photo Library Permission
+  '#6366F1', // Step 6: Storage Permission
 ];
 
 const BG = '#0d0f12';
@@ -33,11 +32,11 @@ interface Props {
 
 export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
   const [step, setStep] = useState(initialStep);
-  const [waiting, setWaiting] = useState<'overlay' | 'fsi' | 'location' | 'media' | 'storage' | null>(null);
+  const [waiting, setWaiting] = useState<'overlay' | 'location' | 'media' | 'storage' | null>(null);
   const [locationPerm, setLocationPerm] = useState(false);
   const perms = usePermissions();
   const accent = STEP_ACCENT[step];
-  const isLast = step === 7;
+  const isLast = step === 6;
 
   useEffect(() => {
     (async () => {
@@ -49,22 +48,15 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
   // Clear waiting state when the corresponding permission is granted
   useEffect(() => {
     if (waiting === 'overlay' && perms.overlay) setWaiting(null);
-    if (waiting === 'fsi' && perms.fullScreenIntent) setWaiting(null);
     if (waiting === 'location' && locationPerm) setWaiting(null);
     if (waiting === 'media' && perms.mediaLibrary) setWaiting(null);
     if (waiting === 'storage' && perms.storage) setWaiting(null);
-  }, [perms.overlay, perms.fullScreenIntent, perms.mediaLibrary, perms.storage, locationPerm, waiting]);
+  }, [perms.overlay, perms.mediaLibrary, perms.storage, locationPerm, waiting]);
 
   function grantOverlay() {
     if (perms.overlay) return;
     perms.openOverlaySettings();
     setWaiting('overlay');
-  }
-
-  function grantFSI() {
-    if (perms.fullScreenIntent) return;
-    perms.openFSISettings();
-    setWaiting('fsi');
   }
 
   async function grantLocation() {
@@ -82,19 +74,12 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
     setWaiting(null);
   }
 
-  async function grantStorage() {
-    if (perms.storage) return;
-    setWaiting('storage');
-    await perms.requestStoragePermission();
-    setWaiting(null);
-  }
 
   function isGranted(s: number) {
     if (s === 3) return perms.overlay;
-    if (s === 4) return perms.fullScreenIntent;
-    if (s === 5) return locationPerm;
-    if (s === 6) return perms.mediaLibrary;
-    if (s === 7) return perms.storage;
+    if (s === 4) return locationPerm;
+    if (s === 5) return perms.mediaLibrary;
+    if (s === 6) return perms.storage;
     return false;
   }
 
@@ -109,23 +94,18 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
       return;
     }
     if (step === 4) {
-      if (perms.fullScreenIntent) setStep(5);
-      else grantFSI();
-      return;
-    }
-    if (step === 5) {
-      if (locationPerm) setStep(6);
+      if (locationPerm) setStep(5);
       else grantLocation();
       return;
     }
-    if (step === 6) {
-      if (perms.mediaLibrary) setStep(7);
+    if (step === 5) {
+      if (perms.mediaLibrary) setStep(6);
       else grantMedia();
       return;
     }
-    if (step === 7) {
-      const missingStep = [3, 4, 5, 6, 7].find(s => !isGranted(s));
-      if (missingStep !== undefined && missingStep < 7) {
+    if (step === 6) {
+      const missingStep = [3, 4, 5, 6].find(s => !isGranted(s));
+      if (missingStep !== undefined && missingStep < 6) {
         setStep(missingStep);
       } else {
         onDone();
@@ -137,7 +117,7 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
   function ctaLabel() {
     if (step === 0) return 'Get Started';
     if (step === 1 || step === 2) return 'Continue';
-    if (step === 7) return 'Finish';
+    if (step === 6) return 'Finish';
     if (isGranted(step)) return 'Continue';
     return 'Grant Permission';
   }
@@ -146,7 +126,7 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
       {/* Progress dots */}
       <View style={{ flexDirection: 'row', justifyContent: 'center', paddingTop: 20, gap: 6 }}>
-        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
           <View
             key={i}
             style={{
@@ -202,28 +182,25 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
               elevation: 4,
             }}>
               {step === 3 && <Lock size={44} color={accent} />}
-              {step === 4 && <Smartphone size={44} color={accent} />}
-              {step === 5 && <MapPin size={44} color={accent} />}
-              {step === 6 && <ImagePlus size={44} color={accent} />}
-              {step === 7 && <Folder size={44} color={accent} />}
+              {step === 4 && <MapPin size={44} color={accent} />}
+              {step === 5 && <ImagePlus size={44} color={accent} />}
+              {step === 6 && <Folder size={44} color={accent} />}
             </View>
 
             {/* Title */}
             <Text style={{ fontSize: 26, fontWeight: '800', color: TEXT, textAlign: 'center', marginBottom: 12, lineHeight: 34 }}>
               {step === 3 && 'Display Over Other Apps'}
-              {step === 4 && 'Full Screen Intent'}
-              {step === 5 && 'Location Services'}
-              {step === 6 && 'Photo Library Access'}
-              {step === 7 && 'Storage Access'}
+              {step === 4 && 'Location Services'}
+              {step === 5 && 'Photo Library Access'}
+              {step === 6 && 'Storage Access'}
             </Text>
 
             {/* Description */}
             <Text style={{ fontSize: 14, color: TEXT2, textAlign: 'center', lineHeight: 22, paddingHorizontal: 12, marginBottom: 28 }}>
               {step === 3 && 'Allows InformaTheme to display your beautiful customized widgets directly on top of your system lockscreen whenever you wake your phone.'}
-              {step === 4 && 'Required by Android to launch and render your lockscreen overlay with native, lag-free performance immediately upon device wake.'}
-              {step === 5 && 'Enables the lockscreen weather widget to retrieve real-time local conditions and temperatures on-device. We never track or share your location.'}
-              {step === 6 && 'Allows you to select, crop, and apply stunning custom filters to your personal gallery photos to use as wallpapers. (Highly recommended!)'}
-              {step === 7 && 'Required to securely export and import your milestones, themes, and settings as JSON backup files, making them easily shareable on WhatsApp.'}
+              {step === 4 && 'Enables the lockscreen weather widget to retrieve real-time local conditions and temperatures on-device. We never track or share your location.'}
+              {step === 5 && 'Allows you to select, crop, and apply stunning custom filters to your personal gallery photos to use as wallpapers. (Highly recommended!)'}
+              {step === 6 && 'Required to securely export and import your milestones, themes, and settings as JSON backup files, making them easily shareable on WhatsApp.'}
             </Text>
 
             {/* Premium Status Indicator Card */}
@@ -249,17 +226,16 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
                   alignItems: 'center',
                 }}>
                   {step === 3 && <Lock size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
-                  {step === 4 && <Smartphone size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
-                  {step === 5 && <MapPin size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
-                  {step === 6 && <ImagePlus size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
-                  {step === 7 && <Folder size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
+                  {step === 4 && <MapPin size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
+                  {step === 5 && <ImagePlus size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
+                  {step === 6 && <Folder size={18} color={isGranted(step) ? '#4ADE80' : TEXT2} />}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: TEXT }}>
                     {isGranted(step) ? 'Permission Granted' : 'Requires Approval'}
                   </Text>
                   <Text style={{ fontSize: 11, color: TEXT3, marginTop: 1 }}>
-                    {step === 6 ? 'Optional permission' : 'Required for full features'}
+                    {step === 5 ? 'Optional permission' : 'Required for full features'}
                   </Text>
                 </View>
               </View>
@@ -275,16 +251,6 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
               )}
             </View>
 
-            {/* Special Instructions / Hints for FSI */}
-            {step === 4 && !perms.fullScreenIntent && (
-              <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: 'rgba(251,146,60,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(251,146,60,0.2)', width: width - 64 }}>
-                <Text style={{ fontSize: 11, color: '#FB923C', lineHeight: 17, textAlign: 'center' }}>
-                  If the settings page doesn't open automatically, go to:{'\n'}
-                  <Text style={{ fontWeight: '700' }}>Settings → Apps → InformaTheme → Notifications</Text>
-                  {'\n'}and enable "Allow full-screen displays"
-                </Text>
-              </View>
-            )}
           </>
         )}
       </View>

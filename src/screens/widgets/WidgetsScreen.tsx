@@ -9,6 +9,7 @@ import { Clock, Calendar, Heart, Sprout, Cloud, Battery, Target, Hourglass, Cake
 function getWidgetIcon(id: string, color: string) {
   switch (id) {
     case 'clock': return <Clock size={28} color={color} />;
+    case 'todo': return <Hourglass size={28} color={color} />;
     case 'milestone': return <Calendar size={28} color={color} />;
     case 'anniversary': return <Heart size={28} color={color} />;
     case 'birthday': return <Cake size={28} color={color} />;

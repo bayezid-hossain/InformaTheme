@@ -24,7 +24,13 @@ export function liveAge(date: Date): LiveAge {
   const months = differenceInMonths(now, date) % 12;
   const afterYearsMonths = new Date(date.getFullYear() + years, date.getMonth() + months, date.getDate());
   const days = differenceInDays(now, afterYearsMonths);
-  return { years, months, days, label: `${years}y ${months}m ${days}d` };
+  
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years}y`);
+  if (months > 0) parts.push(`${months}m`);
+  if (days > 0 || parts.length === 0) parts.push(`${days}d`);
+  
+  return { years, months, days, label: parts.join(' ') };
 }
 
 export function daysUntilNextBirthday(date: Date): number {

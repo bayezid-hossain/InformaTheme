@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { Sun, Flame, Moon, Bell, Lock, Unlock, Palette, LayoutGrid, Image as ImageIcon, Settings, Cake, Heart, Star } from 'lucide-react-native';
-import { useTheme } from '../../hooks/useTheme';
-import { useDates } from '../../context/DateStoreContext';
-import { useOverlay } from '../../hooks/useOverlay';
-import { useWidgetStore } from '../../hooks/useWidgetStore';
-import { differenceInDays, addYears, format } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useNavigation } from '@react-navigation/native';
+import { addYears, differenceInDays, format } from 'date-fns';
+import { Cake, Flame, Heart, Hourglass, Image as ImageIcon, LayoutGrid, Lock, Moon, Palette, Settings, Star, Sun, Unlock, History, Archive } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDates } from '../../context/DateStoreContext';
+import { useKeyboardVisible } from '../../hooks/useKeyboardVisible';
+import { useOverlay } from '../../hooks/useOverlay';
+import { useTheme } from '../../hooks/useTheme';
+import { useWidgetStore } from '../../hooks/useWidgetStore';
 
 const TYPE_COLOR: Record<string, string> = {
+  todo: '#60A5FA',
   birthday: '#4ADE80',
   anniversary: '#F472B6',
   milestone: '#FBBF24',
@@ -18,6 +20,7 @@ const TYPE_COLOR: Record<string, string> = {
 
 function getTypeIcon(type: string, color: string) {
   switch (type) {
+    case 'todo': return <Hourglass size={20} color={color} />;
     case 'birthday': return <Cake size={20} color={color} />;
     case 'anniversary': return <Heart size={20} color={color} />;
     case 'milestone': return <Star size={20} color={color} />;
@@ -43,24 +46,24 @@ function daysUntilNext(dateISO: string, type: string): number | null {
   const next = thisYear <= now ? addYears(thisYear, 1) : thisYear;
   return differenceInDays(next, now);
 }
- 
+
 function getCountdownBreakdown(dateISO: string, type: string) {
   if (type === 'milestone') return null;
   const origin = new Date(dateISO);
   const now = new Date();
-  
+
   // Normalize both dates to midnight to prevent timezone or mid-day calculation mismatches
   const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const next = new Date(nowMidnight.getFullYear(), origin.getMonth(), origin.getDate());
   if (next <= nowMidnight) {
     next.setFullYear(nowMidnight.getFullYear() + 1);
   }
-  
+
   const totalDays = differenceInDays(next, nowMidnight);
-  
+
   let nextMonths = next.getMonth() - nowMidnight.getMonth();
   let nextDays = next.getDate() - nowMidnight.getDate();
-  
+
   if (nextDays < 0) {
     nextMonths--;
     const prevMonthDate = new Date(next.getFullYear(), next.getMonth(), 0);
@@ -69,7 +72,7 @@ function getCountdownBreakdown(dateISO: string, type: string) {
   if (nextMonths < 0) {
     nextMonths += 12;
   }
-  
+
   return { months: nextMonths, days: nextDays, totalDays };
 }
 
@@ -82,9 +85,56 @@ function liveAgeShort(dateISO: string) {
   }
 }
 
+function getTodoRemainingTime(dateISO: string) {
+  try {
+    const target = new Date(dateISO);
+    const now = new Date();
+    const diffMs = target.getTime() - now.getTime();
+    if (diffMs <= 0) return 'Expired';
+    
+    let years = target.getFullYear() - now.getFullYear();
+    let months = target.getMonth() - now.getMonth();
+    let days = target.getDate() - now.getDate();
+    let hours = target.getHours() - now.getHours();
+    let mins = target.getMinutes() - now.getMinutes();
+
+    if (mins < 0) {
+      hours--;
+      mins += 60;
+    }
+    if (hours < 0) {
+      days--;
+      hours += 24;
+    }
+    if (days < 0) {
+      months--;
+      const prevMonth = new Date(target.getFullYear(), target.getMonth(), 0);
+      days += prevMonth.getDate();
+    }
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    const totalMonths = years * 12 + months;
+
+    const parts: string[] = [];
+    if (totalMonths > 0) parts.push(`${totalMonths}mo`);
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (mins > 0) parts.push(`${mins}m`);
+
+    return parts.join(' ') || '0m';
+  } catch (e) {
+    return '0m';
+  }
+}
+
 export function HomeScreen() {
   const { colors, variant, setVariant, selectedWallpaper, customWallpaper } = useTheme();
   const navigation = useNavigation<any>();
+  const isKeyboardVisible = useKeyboardVisible();
+  const kbBehavior = isKeyboardVisible ? 'padding' : undefined;
   const { dates, addDate } = useDates();
   const overlay = useOverlay();
   const { widgets } = useWidgetStore();
@@ -93,10 +143,15 @@ export function HomeScreen() {
   const [newLabel, setNewLabel] = useState('');
   const [dateValue, setDateValue] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
-  const [newType, setNewType] = useState<'birthday' | 'anniversary' | 'milestone'>('birthday');
+  const [newType, setNewType] = useState<'birthday' | 'anniversary' | 'milestone' | 'todo'>('todo');
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   function handleSave() {
     if (!newLabel.trim()) return;
+    if (newType === 'todo' && dateValue < new Date()) {
+      alert('A to-do cannot be scheduled in the past. Please select a future date and time.');
+      return;
+    }
     addDate(newLabel.trim(), dateValue.toISOString(), newType);
     setNewLabel('');
     setDateValue(new Date());
@@ -111,7 +166,7 @@ export function HomeScreen() {
     }
     if (a.type === 'milestone') return 1;
     if (b.type === 'milestone') return -1;
-    
+
     const daysA = daysUntilNext(a.dateISO, a.type) ?? 999;
     const daysB = daysUntilNext(b.dateISO, b.type) ?? 999;
     return daysA - daysB; // closest upcoming first
@@ -159,12 +214,12 @@ export function HomeScreen() {
                 onPress={() => {
                   const wpOverride = customWallpaper ? customWallpaper.uri : (selectedWallpaper ? selectedWallpaper : undefined);
                   const wpFilter = customWallpaper ? customWallpaper.filter : undefined;
-                  
+
                   let finalWp = wpOverride;
                   if (wpOverride && !wpOverride.startsWith('file://') && !wpOverride.startsWith('content://') && !wpOverride.startsWith('/')) {
-                      finalWp = `wp_${wpOverride.replace(/([A-Z])/g, '_$1').toLowerCase()}`;
+                    finalWp = `wp_${wpOverride.replace(/([A-Z])/g, '_$1').toLowerCase()}`;
                   }
-                  
+
                   overlay.toggle(variant, colors, dates, finalWp, wpFilter);
                 }}
                 className="w-12 h-[28px] rounded-full justify-center"
@@ -248,19 +303,32 @@ export function HomeScreen() {
                     <View className="flex-1">
                       <Text className="text-[15px] font-bold" style={{ color: colors.text }}>{d.label}</Text>
                       <Text className="text-xs mt-0.5" style={{ color: colors.text3 }}>
-                        {liveAgeShort(d.dateISO)}
+                        {d.type === 'todo' 
+                          ? `Target: ${new Date(d.dateISO).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${new Date(d.dateISO).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+                          : liveAgeShort(d.dateISO)}
                       </Text>
                     </View>
                     {/* Days left breakdown */}
-                    {countdown !== null && (
+                    {d.type === 'todo' ? (
                       <View className="items-end justify-center">
-                        <Text className="text-[20px] font-extrabold leading-none" style={{ color: typeColor }}>
-                          {countdown.totalDays}d
+                        <Text className="text-[14px] font-extrabold" style={{ color: typeColor }}>
+                          {getTodoRemainingTime(d.dateISO)}
                         </Text>
-                        <Text className="text-[10px] font-bold mt-1" style={{ color: colors.text2 }}>
-                          {countdown.months > 0 ? `${countdown.months}m ` : ''}{countdown.days}d left
+                        <Text className="text-[9px] font-bold mt-1" style={{ color: colors.text3 }}>
+                          remaining
                         </Text>
                       </View>
+                    ) : (
+                      countdown !== null && (
+                        <View className="items-end justify-center">
+                          <Text className="text-[20px] font-extrabold leading-none" style={{ color: typeColor }}>
+                            {countdown.totalDays}d
+                          </Text>
+                          <Text className="text-[10px] font-bold mt-1" style={{ color: colors.text2 }}>
+                            {countdown.months > 0 ? `${countdown.months}m ` : ''}{countdown.days}d left
+                          </Text>
+                        </View>
+                      )
                     )}
                   </View>
                 );
@@ -291,6 +359,21 @@ export function HomeScreen() {
               <Text className="text-sm font-bold" style={{ color: colors.text2 }}>See All</Text>
             </TouchableOpacity>
           </View>
+
+          {/* History Button - Next Row */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('History')}
+            className="w-full h-12 rounded-xl flex-row items-center justify-between px-4 border mt-2.5"
+            style={{ backgroundColor: 'rgba(255,255,255,0.02)', borderColor: colors.border }}
+          >
+            <View className="flex-row items-center gap-2.5">
+              <View className="w-7 h-7 rounded-lg items-center justify-center" style={{ backgroundColor: `${colors.accent}15` }}>
+                <Archive size={15} color={colors.accent} />
+              </View>
+              <Text className="text-sm font-bold" style={{ color: colors.text }}>History & Archive</Text>
+            </View>
+            <History size={15} color={colors.text3} />
+          </TouchableOpacity>
         </View>
 
         <View className="px-5 mt-4 mb-4">
@@ -324,7 +407,7 @@ export function HomeScreen() {
 
       <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? kbBehavior : kbBehavior}
           className="flex-1"
         >
           <View className="flex-1 justify-end">
@@ -366,27 +449,80 @@ export function HomeScreen() {
                     display="default"
                     onChange={(_, selectedDate) => {
                       setShowPicker(false);
-                      if (selectedDate) setDateValue(selectedDate);
+                      if (selectedDate) {
+                        const updated = new Date(dateValue);
+                        updated.setFullYear(selectedDate.getFullYear());
+                        updated.setMonth(selectedDate.getMonth());
+                        updated.setDate(selectedDate.getDate());
+                        
+                        if (newType === 'todo' && updated < new Date()) {
+                          alert('A to-do cannot be scheduled in the past. Automatically adjusting to current time.');
+                          setDateValue(new Date());
+                        } else {
+                          setDateValue(updated);
+                          if (selectedDate > new Date()) {
+                            setNewType('todo');
+                          }
+                        }
+                      }
                     }}
-                    maximumDate={new Date()}
                   />
+                )}
+
+                {newType === 'todo' && (
+                  <>
+                    <Text className="text-xs mb-1.5 mt-3" style={{ color: colors.text3 }}>Time</Text>
+                    <TouchableOpacity
+                      onPress={() => setShowTimePicker(true)}
+                      className="rounded-xl border px-3.5 py-3 mb-1 justify-center"
+                      style={{ backgroundColor: colors.bg2, borderColor: colors.border }}
+                    >
+                      <Text style={{ color: colors.text, fontSize: 15 }}>{format(dateValue, 'h:mm a')}</Text>
+                    </TouchableOpacity>
+
+                    {showTimePicker && (
+                      <DateTimePicker
+                        value={dateValue}
+                        mode="time"
+                        display="default"
+                        onChange={(_, selectedTime) => {
+                          setShowTimePicker(false);
+                          if (selectedTime) {
+                            const updated = new Date(dateValue);
+                            updated.setHours(selectedTime.getHours());
+                            updated.setMinutes(selectedTime.getMinutes());
+                            updated.setSeconds(0);
+                            updated.setMilliseconds(0);
+                            
+                            if (updated < new Date()) {
+                              alert('A to-do cannot be scheduled in the past. Automatically adjusting to current time.');
+                              setDateValue(new Date());
+                            } else {
+                              setDateValue(updated);
+                            }
+                          }
+                        }}
+                      />
+                    )}
+                  </>
                 )}
 
                 <View className="mb-4" />
 
                 <Text className="text-xs mb-1.5" style={{ color: colors.text3 }}>Type</Text>
                 <View className="flex-row gap-2 mb-6">
-                  {(['birthday', 'anniversary', 'milestone'] as const).map((t) => (
+                  {(['todo', 'birthday', 'anniversary', 'milestone'] as const).map((t) => (
                     <TouchableOpacity
                       key={t}
                       onPress={() => setNewType(t)}
                       className="flex-1 py-2.5 rounded-xl border items-center justify-center flex-row gap-1"
                       style={{ borderColor: newType === t ? colors.accent : colors.border, backgroundColor: newType === t ? `${colors.accent}15` : 'transparent' }}
                     >
+                      {t === 'todo' && <Hourglass size={14} color={newType === t ? colors.accent : colors.text3} />}
                       {t === 'birthday' && <Cake size={14} color={newType === t ? colors.accent : colors.text3} />}
                       {t === 'anniversary' && <Heart size={14} color={newType === t ? colors.accent : colors.text3} />}
                       {t === 'milestone' && <Star size={14} color={newType === t ? colors.accent : colors.text3} />}
-                      <Text className="text-[13px] font-medium" style={{ color: newType === t ? colors.accent : colors.text3 }}>
+                      <Text className="text-[11px] font-medium" style={{ color: newType === t ? colors.accent : colors.text3 }}>
                         {t}
                       </Text>
                     </TouchableOpacity>

@@ -26,6 +26,7 @@ const THEME_OPTIONS: { id: ThemeVariant; name: string }[] = [
 
 const FONT_CATEGORIES: { id: FontCategory; label: string }[] = [
   { id: 'clock', label: 'Clock' },
+  { id: 'todo', label: 'Todo' },
   { id: 'birthday', label: 'Birthday' },
   { id: 'anniversary', label: 'Anniv.' },
   { id: 'milestone', label: 'Milestone' },

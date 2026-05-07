@@ -17,7 +17,22 @@ export function getDatabase() {
         type TEXT NOT NULL,
         icon TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS deleted_dates_history (
+        id TEXT PRIMARY KEY NOT NULL,
+        label TEXT NOT NULL,
+        dateISO TEXT NOT NULL,
+        type TEXT NOT NULL,
+        icon TEXT NOT NULL,
+        deletedAtISO TEXT NOT NULL,
+        createdAtISO TEXT NOT NULL,
+        status TEXT
+      );
     `);
+    try {
+      _db.execSync('ALTER TABLE deleted_dates_history ADD COLUMN status TEXT;');
+    } catch (e) {
+      // already exists
+    }
   }
   return _db;
 }
@@ -95,5 +110,64 @@ export function replaceAllDatesInDb(dates: AnchorDate[]) {
     }
   } catch (err) {
     console.error('Failed to replace dates in SQLite:', err);
+  }
+}
+
+export interface HistoryEntry {
+  id: string;
+  label: string;
+  dateISO: string;
+  type: string;
+  icon: string;
+  deletedAtISO: string;
+  createdAtISO: string;
+  status?: string;
+}
+
+export function loadHistoryFromDb(): HistoryEntry[] {
+  try {
+    const db = getDatabase();
+    const rows = db.getAllSync('SELECT * FROM deleted_dates_history') as HistoryEntry[];
+    return rows;
+  } catch (err) {
+    console.error('Failed to load history from SQLite:', err);
+    return [];
+  }
+}
+
+export function saveToHistoryDb(entry: HistoryEntry) {
+  try {
+    const db = getDatabase();
+    db.runSync(
+      'INSERT OR REPLACE INTO deleted_dates_history (id, label, dateISO, type, icon, deletedAtISO, createdAtISO, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      String(entry.id),
+      String(entry.label),
+      String(entry.dateISO),
+      String(entry.type),
+      String(entry.icon),
+      String(entry.deletedAtISO),
+      String(entry.createdAtISO),
+      String(entry.status || 'completed')
+    );
+  } catch (err) {
+    console.error('Failed to save to history in SQLite:', err);
+  }
+}
+
+export function deleteFromHistoryDb(id: string) {
+  try {
+    const db = getDatabase();
+    db.runSync('DELETE FROM deleted_dates_history WHERE id = ?', String(id));
+  } catch (err) {
+    console.error('Failed to delete history row from SQLite:', err);
+  }
+}
+
+export function clearHistoryDb() {
+  try {
+    const db = getDatabase();
+    db.runSync('DELETE FROM deleted_dates_history');
+  } catch (err) {
+    console.error('Failed to clear history from SQLite:', err);
   }
 }

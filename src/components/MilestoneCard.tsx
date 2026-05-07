@@ -65,7 +65,12 @@ export function MilestoneCard({ label, date, accentColor, textColor, text2Color,
             Annual Cycle: {percent}%
           </Text>
           <Text style={{ fontSize: 8.5 + sizeOffset, color: text3Color, textAlign: 'right', ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '600' }) }}>
-            {next.months}m {next.days}d left
+            {(() => {
+              const nextParts: string[] = [];
+              if (next.months > 0) nextParts.push(`${next.months}m`);
+              if (next.days > 0 || nextParts.length === 0) nextParts.push(`${next.days}d`);
+              return nextParts.join(' ');
+            })()} left
           </Text>
         </View>
       </View>

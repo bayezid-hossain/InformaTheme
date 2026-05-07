@@ -47,7 +47,7 @@ function AppContent() {
 
   if (onboarded === null || perms.loading) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
-  const missingPermissions = !perms.overlay || !perms.fullScreenIntent;
+  const missingPermissions = !perms.overlay;
 
   return (
     <ThemeContext.Provider value={themeValue}>

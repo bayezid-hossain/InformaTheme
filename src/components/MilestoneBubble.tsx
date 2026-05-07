@@ -65,7 +65,7 @@ export function MilestoneBubble({
             {primary.label}
           </Text>
           <Text style={{ fontSize: 11 + sizeOffset, color: text2Color, marginTop: 1, ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '600' }) }}>
-            Age: {age.years}y {age.months}m {age.days}d
+            Age: {age.label}
           </Text>
         </View>
       </View>

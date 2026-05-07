@@ -7,7 +7,7 @@ import { FontId, DEFAULT_FONT_ID } from '../constants/fonts';
 export type CustomWallpaper = { uri: string; filter: WallpaperFilterId };
 
 export function useThemeProvider() {
-  const [variant, setVariantState] = useState<ThemeVariant>('darkPremium');
+  const [variant, setVariantState] = useState<ThemeVariant>('onyxGold');
   const [selectedWallpaper, setSelectedWallpaperState] = useState<ThemeVariant | null>(null);
   const [customWallpaper, setCustomWallpaperState] = useState<CustomWallpaper | null>(null);
   const [fontId, setFontIdState] = useState<FontId>(DEFAULT_FONT_ID);

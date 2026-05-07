@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Sharing from 'expo-sharing';
-import { AlertTriangle, Battery, Cloud, Download, Folder, ImagePlus, Info, Lock, MapPin, Palette, PenTool, Share2, Smartphone, User, Zap } from 'lucide-react-native';
+import { AlertTriangle, Battery, Cloud, Download, Folder, ImagePlus, Info, Lock, MapPin, Palette, PenTool, Share2, User, Zap } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getFontDef } from '../../constants/fonts';
 import React from 'react';
@@ -197,17 +197,6 @@ export function SettingsScreen() {
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
           <TouchableOpacity
             className="flex-row items-center px-4 py-3.5 gap-3"
-            onPress={() => { if (!perms.fullScreenIntent) perms.openFSISettings(); }}
-          >
-            <View className="w-6 items-center"><Smartphone size={20} color={colors.text} /></View>
-            <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Full Screen Intent</Text>
-            {perms.loading ? (
-              <Text className="text-[13px]" style={{ color: colors.text3 }}>…</Text>
-            ) : permBadge(perms.fullScreenIntent)}
-          </TouchableOpacity>
-          <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
-          <TouchableOpacity
-            className="flex-row items-center px-4 py-3.5 gap-3"
             onPress={grantLocation}
           >
             <View className="w-6 items-center"><MapPin size={20} color={colors.text} /></View>
@@ -278,7 +267,7 @@ export function SettingsScreen() {
         </View>
 
         {/* Hint when permissions missing */}
-        {!perms.loading && (!perms.overlay || !perms.fullScreenIntent) && (
+        {!perms.loading && !perms.overlay && (
           <View className="flex-row items-start gap-2 rounded-xl px-4 py-3 mb-6 border" style={{ backgroundColor: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)' }}>
             <AlertTriangle size={18} color="#ef4444" />
             <Text className="flex-1 text-[13px] leading-5" style={{ color: '#ef4444' }}>

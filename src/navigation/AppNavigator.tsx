@@ -6,6 +6,7 @@ import { WidgetsScreen } from '../screens/widgets/WidgetsScreen';
 import { WallpapersScreen } from '../screens/wallpapers/WallpapersScreen';
 import { WallpaperEditorScreen } from '../screens/wallpapers/WallpaperEditorScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
+import { HistoryScreen } from '../screens/history/HistoryScreen';
 import { ThemeScreen } from '../screens/theme/ThemeScreen';
 import { useTheme } from '../hooks/useTheme';
 import { useDates } from '../context/DateStoreContext';
@@ -57,6 +58,7 @@ export function AppNavigator() {
       <Stack.Screen name="Wallpapers" component={WallpapersScreen} />
       <Stack.Screen name="WallpaperEditor" component={WallpaperEditorScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="History" component={HistoryScreen} />
     </Stack.Navigator>
   );
 }
