@@ -124,8 +124,12 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
       return;
     }
     if (step === 7) {
-      if (perms.storage) onDone();
-      else grantStorage();
+      const missingStep = [3, 4, 5, 6, 7].find(s => !isGranted(s));
+      if (missingStep !== undefined && missingStep < 7) {
+        setStep(missingStep);
+      } else {
+        onDone();
+      }
       return;
     }
   }
@@ -133,7 +137,8 @@ export function OnboardingScreen({ onDone, initialStep = 0 }: Props) {
   function ctaLabel() {
     if (step === 0) return 'Get Started';
     if (step === 1 || step === 2) return 'Continue';
-    if (isGranted(step)) return step === 7 ? 'Finish' : 'Continue';
+    if (step === 7) return 'Finish';
+    if (isGranted(step)) return 'Continue';
     return 'Grant Permission';
   }
 

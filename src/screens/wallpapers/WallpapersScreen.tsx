@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
+import Constants from 'expo-constants';
 import { TopBar } from '../../components/TopBar';
 import { useTheme, themeWallpapers } from '../../hooks/useTheme';
 import { useOverlay } from '../../hooks/useOverlay';
@@ -74,25 +74,28 @@ export function WallpapersScreen() {
     }
   };
 
-  const handleEditPreset = async (wpId: ThemeVariant) => {
-    try {
-      const source = themeWallpapers[wpId];
-      const { Image: RNImage } = require('react-native');
-      const resolved = RNImage.resolveAssetSource(source);
-      if (!resolved?.uri) return;
-      const localPath = `${FileSystem.cacheDirectory}wp_preset_${wpId}.jpg`;
-      const info = await FileSystem.getInfoAsync(localPath);
-      if (!info.exists) {
-        await FileSystem.downloadAsync(resolved.uri, localPath);
+  const handleEditPreset = (wpId: ThemeVariant) => {
+    const source = themeWallpapers[wpId];
+    const resolved = (require('react-native').Image as any).resolveAssetSource(source);
+    if (!resolved?.uri) return;
+
+    let uri: string = resolved.uri;
+
+    // In dev, Metro serves assets via HTTP. Fix the host for real devices:
+    // resolveAssetSource may return 10.0.2.2 (emulator loopback) even on physical devices.
+    if (uri.startsWith('http')) {
+      const hostUri = (Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.hostUri) as string | undefined;
+      if (hostUri) {
+        const metroHost = hostUri.split(':')[0];
+        uri = uri.replace(/10\.0\.2\.2|localhost|127\.0\.0\.1/g, metroHost);
       }
-      navigation.navigate('WallpaperEditor', {
-        imageUri: localPath,
-        imageWidth: resolved.width ?? 1080,
-        imageHeight: resolved.height ?? 1920,
-      });
-    } catch (e) {
-      console.error('[handleEditPreset]', e);
     }
+
+    navigation.navigate('WallpaperEditor', {
+      imageUri: uri,
+      imageWidth: resolved.width ?? 1080,
+      imageHeight: resolved.height ?? 1920,
+    });
   };
 
   const handleRemoveCustom = async () => {

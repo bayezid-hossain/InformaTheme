@@ -234,13 +234,13 @@ export const themes: Record<ThemeVariant, ThemeColors> = {
 };
 
 export const themeWallpapers: Record<ThemeVariant, any> = {
-  onyxGold: require('../../assets/wallpapers/onyx_gold.png'),
+  onyxGold: require('../../assets/wallpapers/onyx_gold.jpg'),
   darkPremium: require('../../assets/wallpapers/dark_premium.png'),
-  royalAmethyst: require('../../assets/wallpapers/royal_amethyst.png'),
+  royalAmethyst: require('../../assets/wallpapers/royal_amethyst.jpg'),
   midnightStars: require('../../assets/wallpapers/midnight_stars.png'),
-  roseQuartz: require('../../assets/wallpapers/rose_quartz.png'),
+  roseQuartz: require('../../assets/wallpapers/rose_quartz.jpg'),
   warmLight: require('../../assets/wallpapers/warm_light.png'),
-  cobaltNight: require('../../assets/wallpapers/cobalt_night.png'),
+  cobaltNight: require('../../assets/wallpapers/cobalt_night.jpg'),
   oceanDive: require('../../assets/wallpapers/ocean_dive.png'),
   glassmorphism: require('../../assets/wallpapers/glassmorphism.png'),
   warmEarth: require('../../assets/wallpapers/warm_earth.png'),

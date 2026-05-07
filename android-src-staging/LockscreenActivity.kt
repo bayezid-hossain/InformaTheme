@@ -357,27 +357,33 @@ class LockscreenActivity : Activity() {
                 })
                             }
             isCustomUri -> {
-                val bmp = loadBitmapFromUri(wallpaper)
-                if (bmp != null) {
-                    root.addView(ImageView(ctx).apply {
-                        setImageBitmap(bmp)
-                        scaleType = ImageView.ScaleType.CENTER_CROP
-                        layoutParams = FrameLayout.LayoutParams(MP, MP)
-                    })
+                // Add placeholder immediately so overlay appears without blocking main thread
+                val wallpaperIv = ImageView(ctx).apply {
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    layoutParams = FrameLayout.LayoutParams(MP, MP)
+                    setBackgroundColor(bgColor)
+                }
+                root.addView(wallpaperIv)
+                val dimView = View(ctx).apply {
+                    setBackgroundColor(if (isLight) Color.argb(30, 255, 255, 255) else Color.argb(100, 0, 0, 0))
+                    layoutParams = FrameLayout.LayoutParams(MP, MP)
+                }
+                root.addView(dimView)
+                filterOverlayColor(wallpaperFilter)?.let { (color, opacity) ->
                     root.addView(View(ctx).apply {
-                        setBackgroundColor(if (isLight) Color.argb(30, 255, 255, 255) else Color.argb(100, 0, 0, 0))
+                        val alpha = (opacity * 255).toInt()
+                        setBackgroundColor(Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)))
                         layoutParams = FrameLayout.LayoutParams(MP, MP)
                     })
-                                        filterOverlayColor(wallpaperFilter)?.let { (color, opacity) ->
-                        root.addView(View(ctx).apply {
-                            val alpha = (opacity * 255).toInt()
-                            setBackgroundColor(Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)))
-                            layoutParams = FrameLayout.LayoutParams(MP, MP)
-                        })
+                }
+                // Decode bitmap on background thread — no main-thread stall
+                val capturedUri = wallpaper
+                Thread {
+                    val bmp = loadBitmapFromUri(capturedUri)
+                    if (bmp != null) {
+                        handler.post { wallpaperIv.setImageBitmap(bmp) }
                     }
-                } else {
-                    root.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(bgColor, bg1Color, bg2Color))
-                                    }
+                }.start()
             }
             else -> {
                 root.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(bgColor, bg1Color, bg2Color))
@@ -454,18 +460,21 @@ class LockscreenActivity : Activity() {
 
         if (enabledWidgets.contains("birthday") && birthdays.isNotEmpty())
             content.addView(buildCarousel(
-                birthdays.mapIndexed { i, it -> buildBirthdayCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color, variant, i == 0, bdTypeface, bdSetting.sizeOffset) }
+                birthdays.mapIndexed { i, it -> buildBirthdayCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color, variant, i == 0, bdTypeface, bdSetting.sizeOffset) },
+                sizeOffset = bdSetting.sizeOffset
             ))
 
         if (enabledWidgets.contains("anniversary") && anniversaries.isNotEmpty())
             content.addView(buildCarousel(
                 anniversaries.mapIndexed { i, it -> buildAnniversaryCard(ctx, it, accentColor, bg1Color, textColor, text3Color, variant, i == 0, annTypeface, annSetting.sizeOffset) },
-                narrow = true
+                narrow = false,
+                sizeOffset = annSetting.sizeOffset
             ))
 
         if (enabledWidgets.contains("milestone") && milestones.isNotEmpty())
             content.addView(buildCarousel(
-                milestones.mapIndexed { i, it -> buildMilestoneCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color, variant, i == 0, msTypeface, msSetting.sizeOffset) }
+                milestones.mapIndexed { i, it -> buildMilestoneCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color, variant, i == 0, msTypeface, msSetting.sizeOffset) },
+                sizeOffset = msSetting.sizeOffset
             ))
 
         // Upcoming chips ≤30 days
@@ -559,17 +568,19 @@ class LockscreenActivity : Activity() {
 
     // ── Card carousels ────────────────────────────────────────────────────────
 
-    private fun buildCarousel(cards: List<View>, narrow: Boolean = false): View {
+    private fun buildCarousel(cards: List<View>, narrow: Boolean = false, sizeOffset: Int = 0): View {
         val MP  = ViewGroup.LayoutParams.MATCH_PARENT
         val WC  = ViewGroup.LayoutParams.WRAP_CONTENT
         val screenW = resources.displayMetrics.widthPixels
         val sidePad = dp(20)
         val gap     = dp(12)
+        val density = resources.displayMetrics.density
         // narrow = show 2 per view (anniversary circles); wide = single card with peek
         val cardW = if (narrow) {
             (screenW - sidePad * 2 - gap) / 2
         } else {
-            screenW - sidePad * 2 - dp(24) // 24dp peek of next card
+            val baseW = dp(260) + (sizeOffset * 8 * density).toInt()
+            minOf(baseW, screenW - sidePad * 2 - dp(12))
         }
 
         val container = LinearLayout(this).apply {
@@ -653,19 +664,15 @@ class LockscreenActivity : Activity() {
         val r = Color.red(bg1Color); val g = Color.green(bg1Color); val b = Color.blue(bg1Color)
         val grad = GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(Color.argb(215, r, g, b), Color.argb(170, r, g, b))
+            intArrayOf(Color.argb(55, r, g, b), Color.argb(35, r, g, b))
         ).apply { cornerRadius = dp(20).toFloat() }
 
         val border = GradientDrawable().apply {
             setColor(Color.TRANSPARENT)
             cornerRadius = dp(20).toFloat()
-            if (highlightColor != null) {
-                setStroke(dp(2), highlightColor)
-            } else {
-                val strokeAlpha = if (isLight) 40 else 70
-                val sc = if (isLight) Color.argb(strokeAlpha, 0, 0, 0) else Color.argb(strokeAlpha, 255, 255, 255)
-                setStroke(dp(1), sc)
-            }
+            val strokeAlpha = if (isLight) 30 else 45
+            val sc = if (isLight) Color.argb(strokeAlpha, 0, 0, 0) else Color.argb(strokeAlpha, 255, 255, 255)
+            setStroke(dp(1), sc)
         }
         return LayerDrawable(arrayOf(grad, border))
     }
@@ -681,47 +688,128 @@ class LockscreenActivity : Activity() {
     ): View {
         val MP = ViewGroup.LayoutParams.MATCH_PARENT
         val WC = ViewGroup.LayoutParams.WRAP_CONTENT
-        return LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null, variant == "warmLight" || variant == "softSage")
+        
+        val scaledOffset = catSizeOffset.toFloat()
+        val density = resources.displayMetrics.density
+        val svgW = dp(150) + (scaledOffset * 10 * density).toInt()
+        val svgH = dp(60) + (scaledOffset * 4 * density).toInt()
 
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null, variant == "warmLight" || variant == "softSage")
+        }
+
+        // Top Row: Icon on left, Label on right
+        val header = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(12) }
+        }
+
+        // Icon Bubble
+        val ar = Color.red(accentColor); val ag = Color.green(accentColor); val ab = Color.blue(accentColor)
+        val bubble = FrameLayout(ctx).apply {
+            val size = dp(34)
+            layoutParams = LinearLayout.LayoutParams(size, size).apply { marginEnd = dp(10) }
+            background = GradientDrawable().apply {
+                setColor(Color.argb(35, ar, ag, ab))
+                cornerRadius = size / 2f
+                setStroke(dp(1), Color.argb(65, ar, ag, ab))
+            }
             addView(TextView(ctx).apply {
-                text = "• Born ${bd.originalDateStr} (${"%,d".format(bd.daysSince)} days ago) ${bd.icon}"
-                setTextColor(accentColor); textSize = 10.5f + catSizeOffset; letterSpacing = 0.03f
-                if (catTypeface != null) typeface = catTypeface
-                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(6) }
+                text = "🎂"
+                textSize = 14f
+                gravity = Gravity.CENTER
+                layoutParams = FrameLayout.LayoutParams(MP, MP)
             })
-            addView(TextView(ctx).apply {
-                text = bd.label
-                setTextColor(textColor); textSize = 15f + catSizeOffset
-                if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
-                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
-            })
-            addView(TextView(ctx).apply {
-                text = "Age: ${bd.years}y ${bd.months}m ${bd.daysRemainder}d"
-                setTextColor(text2Color); textSize = 12f + catSizeOffset
-                if (catTypeface != null) typeface = catTypeface
-                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(8) }
-            })
-            // Divider
-            addView(View(ctx).apply {
-                layoutParams = LinearLayout.LayoutParams(MP, dp(1)).apply { 
-                    marginStart = dp(2); marginEnd = dp(2); topMargin = dp(8); bottomMargin = dp(8) 
+        }
+        header.addView(bubble)
+
+        val titleCol = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, WC, 1f)
+        }
+        titleCol.addView(TextView(ctx).apply {
+            text = bd.label
+            setTextColor(textColor); textSize = 13.5f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+        titleCol.addView(TextView(ctx).apply {
+            text = "Age: ${bd.years}y ${bd.months}m ${bd.daysRemainder}d"
+            setTextColor(text2Color); textSize = 11f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface
+        })
+        header.addView(titleCol)
+        root.addView(header)
+
+        // Center Semi-Circular Gauge Arc
+        val progress = (365f - (bd.daysUntilNext?.toFloat() ?: 0f)) / 365f
+        val gaugeContainer = FrameLayout(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(MP, svgH).apply { topMargin = dp(4) }
+        }
+        
+        class SemiCircleGauge(context: Context) : View(context) {
+            override fun onDraw(canvas: Canvas) {
+                val strokeW = 4f * density
+                val r = height - strokeW - (8f * density)
+                val cx = width / 2f
+                val cy = height - strokeW - (2f * density)
+                
+                val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.STROKE; strokeWidth = strokeW
+                    color = Color.argb(20, 255, 255, 255); strokeCap = Paint.Cap.ROUND
                 }
-                val dividerColor = if (variant == "warmLight" || variant == "softSage") Color.argb(30, 0, 0, 0) else Color.argb(30, 255, 255, 255)
-                setBackgroundColor(dividerColor)
-            })
-            bd.daysUntilNext?.let { until ->
-                addView(TextView(ctx).apply {
-                    val labelPrefix = if (bd.type == "birthday") "Next Birthday" else "Next Event"
-                    text = "$labelPrefix: ${bd.nextMonths}m ${bd.nextDays}d ($until Days)"
-                    setTextColor(text3Color); textSize = 11f + catSizeOffset; letterSpacing = 0.05f
-                    if (catTypeface != null) typeface = catTypeface
-                    layoutParams = LinearLayout.LayoutParams(MP, WC)
-                })
+                val fgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.STROKE; strokeWidth = strokeW
+                    color = accentColor; strokeCap = Paint.Cap.ROUND
+                }
+                val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.FILL; color = Color.WHITE
+                }
+
+                val rect = RectF(cx - r, cy - r, cx + r, cy + r)
+                canvas.drawArc(rect, 180f, 180f, false, bgPaint)
+                val sweep = progress * 180f
+                canvas.drawArc(rect, 180f, sweep, false, fgPaint)
+                
+                val theta = Math.PI - (progress * Math.PI)
+                val dotX = cx + r * Math.cos(theta)
+                val dotY = cy - r * Math.sin(theta)
+                canvas.drawCircle(dotX.toFloat(), dotY.toFloat(), 3f * density, dotPaint)
             }
         }
+
+        val gaugeView = SemiCircleGauge(ctx).apply {
+            layoutParams = FrameLayout.LayoutParams(svgW, svgH).apply { gravity = Gravity.CENTER }
+        }
+        gaugeContainer.addView(gaugeView)
+
+        val textOverlay = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = FrameLayout.LayoutParams(MP, WC).apply { gravity = Gravity.BOTTOM; bottomMargin = dp(1) }
+        }
+        textOverlay.addView(TextView(ctx).apply {
+            text = "${bd.daysUntilNext ?: 0} Days"
+            setTextColor(textColor); textSize = 14f + (catSizeOffset * 0.7f)
+            gravity = Gravity.CENTER
+            if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(MP, WC)
+        })
+        textOverlay.addView(TextView(ctx).apply {
+            text = "Next Birthday"
+            setTextColor(text3Color); textSize = 8f + (catSizeOffset * 0.5f)
+            gravity = Gravity.CENTER
+            if (catTypeface != null) typeface = catTypeface
+            layoutParams = LinearLayout.LayoutParams(MP, WC)
+        })
+        gaugeContainer.addView(textOverlay)
+        root.addView(gaugeContainer)
+
+        return root
     }
 
     private fun buildAnniversaryCard(
@@ -735,39 +823,56 @@ class LockscreenActivity : Activity() {
     ): View {
         val MP = ViewGroup.LayoutParams.MATCH_PARENT
         val WC = ViewGroup.LayoutParams.WRAP_CONTENT
-        val circleSize = dp(76)
-        val lbl  = if (ann.years >= 1) "${ann.years}y" else "${ann.daysSince}d"
+        
+        val scaledOffset = catSizeOffset.toFloat()
+        val density = resources.displayMetrics.density
+        val ringSize = dp(54) + (scaledOffset * 2 * density).toInt()
+
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null, variant == "warmLight" || variant == "softSage")
+        }
+
+        val sublabel = if (ann.years >= 1) "${ann.years}y" else "${ann.daysSince}d"
         val prog = (ann.daysSince % 365).toFloat() / 365f
 
-        return LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(12), dp(16), dp(12), dp(16))
-            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null, variant == "warmLight" || variant == "softSage")
-
-            addView(buildCircleRing(ctx, circleSize, prog, accentColor, lbl, ann.label, textColor, catTypeface, catSizeOffset).apply {
-                layoutParams = LinearLayout.LayoutParams(WC, WC).apply { gravity = Gravity.CENTER_HORIZONTAL }
-            })
-            ann.daysUntilNext?.let { until ->
-                addView(View(ctx).apply {
-                    layoutParams = LinearLayout.LayoutParams(MP, dp(1)).apply { topMargin = dp(10); bottomMargin = dp(8) }
-                    val dividerColor = if (variant == "warmLight" || variant == "softSage") Color.argb(30, 0, 0, 0) else Color.argb(20, 255, 255, 255)
-                    setBackgroundColor(dividerColor)
-                })
-                addView(TextView(ctx).apply {
-                    text = "Since: ${ann.originalDateStr}"
-                    setTextColor(text3Color); textSize = 8.5f + catSizeOffset; gravity = Gravity.CENTER
-                    if (catTypeface != null) typeface = catTypeface
-                    layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(2) }
-                })
-                addView(TextView(ctx).apply {
-                    text = "Next: ${ann.nextMonths}m ${ann.nextDays}d"
-                    setTextColor(text3Color); textSize = 9f + catSizeOffset; gravity = Gravity.CENTER
-                    if (catTypeface != null) typeface = catTypeface
-                    layoutParams = LinearLayout.LayoutParams(MP, WC)
-                })
-            }
+        // Progress ring on left
+        val ring = buildCircleRing(ctx, ringSize, prog, accentColor, sublabel, "", textColor, catTypeface, catSizeOffset).apply {
+            layoutParams = LinearLayout.LayoutParams(WC, WC).apply { marginEnd = dp(14) }
         }
+        root.addView(ring)
+
+        // Text details on right
+        val details = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, WC, 1f)
+        }
+        details.addView(TextView(ctx).apply {
+            text = ann.label
+            setTextColor(textColor); textSize = 13.5f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+        details.addView(TextView(ctx).apply {
+            text = "Since ${ann.originalDateStr}"
+            setTextColor(text3Color); textSize = 10f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { topMargin = dp(2) }
+        })
+        ann.daysUntilNext?.let { until ->
+            details.addView(TextView(ctx).apply {
+                text = "Next: ${ann.nextMonths}m ${ann.nextDays}d ($until d)"
+                setTextColor(text3Color); textSize = 9.5f + catSizeOffset
+                if (catTypeface != null) typeface = catTypeface
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { topMargin = dp(2) }
+            })
+        }
+        root.addView(details)
+
+        return root
     }
 
     private fun buildMilestoneCard(
@@ -784,69 +889,118 @@ class LockscreenActivity : Activity() {
         val prog = (ms.daysSince % 365).toFloat() / 365f
         val percent = (prog * 100).toInt().coerceIn(0, 100)
 
-        return LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null, variant == "warmLight" || variant == "softSage")
+        val scaledOffset = catSizeOffset.toFloat()
+        val density = resources.displayMetrics.density
+        val barWidth = dp(110) + (scaledOffset * 4 * density).toInt()
 
-            // Label & Date
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null, variant == "warmLight" || variant == "softSage")
+        }
+
+        // Top Row: Icon on left, Label on right
+        val topRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(12) }
+        }
+
+        // Icon Bubble
+        val ar = Color.red(accentColor); val ag = Color.green(accentColor); val ab = Color.blue(accentColor)
+        val bubble = FrameLayout(ctx).apply {
+            val size = dp(34)
+            layoutParams = LinearLayout.LayoutParams(size, size)
+            background = GradientDrawable().apply {
+                setColor(Color.argb(35, ar, ag, ab))
+                cornerRadius = size / 2f
+                setStroke(dp(1), Color.argb(65, ar, ag, ab))
+            }
             addView(TextView(ctx).apply {
-                text = "${ms.label.uppercase()} (${ms.originalDateStr})"
-                setTextColor(text2Color); textSize = 10.5f + catSizeOffset; letterSpacing = 0.05f
-                if (catTypeface != null) typeface = catTypeface
-                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
-            })
-            // Main Days Count
-            addView(TextView(ctx).apply {
-                text = "${"%,d".format(ms.daysSince)} Days Ago"
-                setTextColor(textColor); textSize = 22f + catSizeOffset
-                if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
-                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
-            })
-            // Years, Months, Days breakdown
-            addView(TextView(ctx).apply {
-                text = "Time Elapsed: ${ms.years}y ${ms.months}m ${ms.daysRemainder}d"
-                setTextColor(text2Color); textSize = 12.5f + catSizeOffset
-                if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
-                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(12) }
-            })
-            // Progress Bar Labels (Horizontal row)
-            addView(LinearLayout(ctx).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
-                // Left percentage
-                addView(TextView(ctx).apply {
-                    text = "Annual Cycle: $percent%"
-                    setTextColor(text3Color); textSize = 9.5f + catSizeOffset
-                    if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
-                    layoutParams = LinearLayout.LayoutParams(0, WC, 1f)
-                })
-                // Right remaining time
-                addView(TextView(ctx).apply {
-                    text = "${ms.nextMonths}m ${ms.nextDays}d left"
-                    setTextColor(text3Color); textSize = 9.5f + catSizeOffset
-                    if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
-                    gravity = Gravity.END
-                    layoutParams = LinearLayout.LayoutParams(WC, WC)
-                })
-            })
-            // Progress bar
-            addView(LinearLayout(ctx).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(MP, dp(5))
-                addView(View(ctx).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, MP, prog).apply { marginEnd = dp(1) }
-                    background = GradientDrawable().apply { setColor(accentColor); cornerRadius = 2.5f * resources.displayMetrics.density }
-                })
-                addView(View(ctx).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, MP, 1f - prog)
-                    background = GradientDrawable().apply {
-                        setColor(Color.argb(20, 255, 255, 255)); cornerRadius = 2.5f * resources.displayMetrics.density
-                    }
-                })
+                text = "⭐"
+                textSize = 14f
+                gravity = Gravity.CENTER
+                layoutParams = FrameLayout.LayoutParams(MP, MP)
             })
         }
+        topRow.addView(bubble)
+
+        topRow.addView(TextView(ctx).apply {
+            text = ms.label
+            setTextColor(textColor); textSize = 13f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.END
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            layoutParams = LinearLayout.LayoutParams(0, WC, 1f)
+        })
+        root.addView(topRow)
+
+        // Bottom Row: Stat on left, Progress bar on right
+        val bottomRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.BOTTOM
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { topMargin = dp(4) }
+        }
+
+        // Left Column (Days)
+        val leftCol = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, WC, 1f)
+        }
+        leftCol.addView(TextView(ctx).apply {
+            text = "%,d".format(ms.daysSince)
+            setTextColor(textColor); textSize = 22f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
+        })
+        leftCol.addView(TextView(ctx).apply {
+            text = "Days Ago"
+            setTextColor(text2Color); textSize = 11f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface
+            layoutParams = LinearLayout.LayoutParams(MP, WC).apply { topMargin = dp(1) }
+        })
+        bottomRow.addView(leftCol)
+
+        // Right Column (Progress)
+        val rightCol = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(barWidth, WC)
+        }
+
+        // Slim Progress Bar
+        val progressBar = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(MP, dp(5)).apply { bottomMargin = dp(4) }
+            addView(View(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(0, MP, prog).apply { marginEnd = dp(1) }
+                background = GradientDrawable().apply { setColor(accentColor); cornerRadius = 2.5f * density }
+            })
+            addView(View(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(0, MP, 1f - prog)
+                background = GradientDrawable().apply {
+                    setColor(Color.argb(20, 255, 255, 255)); cornerRadius = 2.5f * density
+                }
+            })
+        }
+        rightCol.addView(progressBar)
+
+        rightCol.addView(TextView(ctx).apply {
+            text = "Annual Cycle: $percent%"
+            setTextColor(text3Color); textSize = 8.5f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface
+            gravity = Gravity.END
+        })
+        rightCol.addView(TextView(ctx).apply {
+            text = "${ms.nextMonths}m ${ms.nextDays}d left"
+            setTextColor(text3Color); textSize = 8.5f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface
+            gravity = Gravity.END
+        })
+        bottomRow.addView(rightCol)
+        root.addView(bottomRow)
+
+        return root
     }
 
     // ── Widgets ───────────────────────────────────────────────────────────────
@@ -884,6 +1038,15 @@ class LockscreenActivity : Activity() {
                 canvas.drawArc(RectF(cx - r, cy - r, cx + r, cy + r), -90f, clamped * 360f, false, fgPaint)
                 canvas.drawText(centerText, cx, cy + txtPaint.textSize * 0.35f, txtPaint)
             }
+        })
+        container.addView(TextView(ctx).apply {
+            text = "♥"
+            setTextColor(accentColor)
+            textSize = 10f + catSizeOffset
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(2) }
         })
         container.addView(TextView(ctx).apply {
             text = label

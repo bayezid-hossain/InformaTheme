@@ -2,6 +2,22 @@
 
 ---
 
+## 2026-05-07 (session 6) — Fix preset wallpaper editor + overlay startup lag
+
+**Plan:**
+1. `handleEditPreset` in WallpapersScreen fails on real devices because it tries to `downloadAsync` from Metro at `10.0.2.2:8081` (emulator loopback) — times out after 60s.
+2. Custom wallpaper bitmap decoded synchronously on main thread in `buildOverlayView`, blocking overlay display.
+
+**Steps completed:**
+1. Removed `expo-file-system/legacy`, `expo-constants` legacy imports from WallpapersScreen; replaced with `expo-constants` (current API).
+2. Rewrote `handleEditPreset` as synchronous: uses `resolveAssetSource` to get URI, fixes Metro host via regex replacing `10.0.2.2|localhost|127.0.0.1` with actual `Constants.expoConfig.hostUri` host, navigates immediately. No blocking download in the screen — `ImageManipulator` in the editor handles remote URIs itself.
+3. In `LockscreenActivity.kt` `buildOverlayView`: custom wallpaper branch now adds a placeholder `ImageView` immediately (shows bgColor), then decodes the bitmap on a background `Thread` and posts back via `handler.post`. Overlay appears instantly; wallpaper fills in within ~100-300ms.
+4. Synced `LockscreenActivity.kt` staging → production.
+
+**Deviations:** None.
+
+---
+
 ## 2026-05-07 (session 5) — Crop: top/bottom context visibility
 
 **Plan:** Add top/bottom dim panels to crop view so user can see what's being cut vertically (same as existing left/right panels).

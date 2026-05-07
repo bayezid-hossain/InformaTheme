@@ -1,4 +1,5 @@
 import React from 'react';
+import { Heart } from 'lucide-react-native';
 import { Dimensions, Image, StyleSheet, Text, View } from 'react-native';
 import { getFontDef } from '../constants/fonts';
 import { getFilterOverlay } from '../constants/wallpaperFilters';
@@ -41,27 +42,37 @@ function AnniversaryCard({ label, date, accentColor, textColor, text3Color }: An
   const sublabel = age.years >= 1 ? `${age.years}y` : `${daysSince}d`;
   const next = nextEventCountdown(date);
 
+  const cardWidth = 260 + sizeOffset * 8;
+  const ringSize = 54 + sizeOffset * 2;
+
   return (
-    <GlassBubble style={{ width: 125, padding: 12, alignItems: 'center' }}>
-      <ProgressRing
-        progress={prog}
-        size={60}
-        strokeWidth={3.5}
-        color={accentColor}
-        label={label}
-        sublabel={sublabel}
-        fontFamily={fontFamily}
-        sizeOffset={sizeOffset}
-        textColor={textColor}
-        sublabelColor={textColor}
-      />
-      <View style={{ width: '100%', height: 1, backgroundColor: (textColor === '#fff' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'), marginVertical: 8 }} />
-      <Text style={{ fontSize: 8.5 + sizeOffset, color: text3Color, textAlign: 'center', marginBottom: 2, ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '700' }) }}>
-        Since: {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-      </Text>
-      <Text style={{ fontSize: 9 + sizeOffset, color: text3Color, textAlign: 'center', ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '700' }) }}>
-        Next: {next.months}m {next.days}d
-      </Text>
+    <GlassBubble style={{ width: cardWidth, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <View style={{ alignItems: 'center' }}>
+        <ProgressRing
+          progress={prog}
+          size={ringSize}
+          strokeWidth={3}
+          color={accentColor}
+          sublabel={sublabel}
+          fontFamily={fontFamily}
+          sizeOffset={sizeOffset}
+          textColor={textColor}
+          sublabelColor={textColor}
+          showHeart={false}
+        />
+        <Heart size={10} color={accentColor} fill={accentColor} style={{ marginTop: 4 }} />
+      </View>
+      <View style={{ flex: 1, justifyContent: 'center' }}>
+        <Text numberOfLines={1} style={{ fontSize: 13.5 + sizeOffset, color: textColor, ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '700' }) }}>
+          {label}
+        </Text>
+        <Text style={{ fontSize: 10 + sizeOffset, color: text3Color, marginTop: 2, ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '600' }) }}>
+          Since {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </Text>
+        <Text style={{ fontSize: 9.5 + sizeOffset, color: text3Color, marginTop: 2, ...(fontFamily ? { fontFamily, fontWeight: font.fontWeight as any } : { fontWeight: '600' }) }}>
+          Next: {next.months}m {next.days}d ({next.totalDays}d)
+        </Text>
+      </View>
     </GlassBubble>
   );
 }

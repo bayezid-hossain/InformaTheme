@@ -83,11 +83,11 @@ export function useOverlay() {
     setSyncing(false);
   }, []);
 
-  const start = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], wallpaper?: string) => {
+  const start = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], wallpaper?: string, wallpaperFilter?: string) => {
     if (!LockscreenModule) return;
     try {
       // Sync data first
-      await syncData(variant, colors, dates, undefined, undefined, wallpaper);
+      await syncData(variant, colors, dates, undefined, undefined, wallpaper, wallpaperFilter);
       // Then start
       await LockscreenModule.startOverlay();
       setActive(true);
@@ -106,11 +106,11 @@ export function useOverlay() {
     }
   }, []);
 
-  const toggle = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], wallpaper?: string) => {
+  const toggle = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], wallpaper?: string, wallpaperFilter?: string) => {
     if (active) {
       await stop();
     } else {
-      await start(variant, colors, dates, wallpaper);
+      await start(variant, colors, dates, wallpaper, wallpaperFilter);
     }
   }, [active, start, stop]);
 

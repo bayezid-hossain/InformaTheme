@@ -83,7 +83,7 @@ function liveAgeShort(dateISO: string) {
 }
 
 export function HomeScreen() {
-  const { colors, variant, setVariant, selectedWallpaper } = useTheme();
+  const { colors, variant, setVariant, selectedWallpaper, customWallpaper } = useTheme();
   const navigation = useNavigation<any>();
   const { dates, addDate } = useDates();
   const overlay = useOverlay();
@@ -157,9 +157,15 @@ export function HomeScreen() {
               </View>
               <TouchableOpacity
                 onPress={() => {
-                  const wpKey = selectedWallpaper || variant;
-                  const wpName = `wp_${wpKey.replace(/([A-Z])/g, '_$1').toLowerCase()}`;
-                  overlay.toggle(variant, colors, dates, wpName);
+                  const wpOverride = customWallpaper ? customWallpaper.uri : (selectedWallpaper ? selectedWallpaper : undefined);
+                  const wpFilter = customWallpaper ? customWallpaper.filter : undefined;
+                  
+                  let finalWp = wpOverride;
+                  if (wpOverride && !wpOverride.startsWith('file://') && !wpOverride.startsWith('content://') && !wpOverride.startsWith('/')) {
+                      finalWp = `wp_${wpOverride.replace(/([A-Z])/g, '_$1').toLowerCase()}`;
+                  }
+                  
+                  overlay.toggle(variant, colors, dates, finalWp, wpFilter);
                 }}
                 className="w-12 h-[28px] rounded-full justify-center"
                 style={{ backgroundColor: overlay.active ? colors.accent : colors.bg3 }}

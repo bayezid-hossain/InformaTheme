@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { Heart } from 'lucide-react-native';
 
 interface Props {
   progress: number; // 0–1
@@ -14,6 +15,7 @@ interface Props {
   sizeOffset?: number;
   textColor?: string;
   sublabelColor?: string;
+  showHeart?: boolean;
 }
 
 export function ProgressRing({
@@ -28,6 +30,7 @@ export function ProgressRing({
   sizeOffset = 0,
   textColor = 'rgba(255,255,255,0.75)',
   sublabelColor = '#fff',
+  showHeart = true,
 }: Props) {
   const radius = (size - strokeWidth * 2) / 2;
   const circ = 2 * Math.PI * radius;
@@ -49,8 +52,15 @@ export function ProgressRing({
           />
         </Svg>
         {sublabel && (
-          <View className="absolute inset-0 items-center justify-center">
-            <Text style={{ fontSize: 11 + sizeOffset, color: sublabelColor, ...(fontFamily ? { fontFamily } : { fontWeight: '700' }) }}>{sublabel}</Text>
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', paddingTop: 1 }}>
+            <Text style={{ fontSize: 10 + sizeOffset, color: sublabelColor, ...(fontFamily ? { fontFamily, fontWeight: '700' } : { fontWeight: '700' }) }}>
+              {sublabel}
+            </Text>
+            {showHeart && (
+              <View style={{ marginTop: 0.5 }}>
+                <Heart size={6} color={color} fill={color} />
+              </View>
+            )}
           </View>
         )}
       </View>
