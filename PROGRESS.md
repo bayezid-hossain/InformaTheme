@@ -2,6 +2,94 @@
 
 ---
 
+## 2026-05-07 (session 5) — Crop: top/bottom context visibility
+
+**Plan:** Add top/bottom dim panels to crop view so user can see what's being cut vertically (same as existing left/right panels).
+
+**Steps completed:**
+1. Added `VERT_MARGIN = 52` constant — pixels of image context shown above/below the crop frame.
+2. Recalculated `CROP_DISP_H = min(SCREEN_W * CROP_ASPECT, MAX_CROP_H - 2*VERT_MARGIN)` so the crop frame always fits inside the container with margin on all sides.
+3. Added `CONTAINER_H = CROP_DISP_H + 2*VERT_MARGIN` and `SIDE_MARGIN = (SCREEN_W - CROP_DISP_W) / 2`.
+4. Updated crop view container to use `CONTAINER_H`.
+5. Added top and bottom dim panels (matching left/right style).
+6. Updated crop frame border to be positioned at `left: SIDE_MARGIN, top: VERT_MARGIN, width: CROP_DISP_W, height: CROP_DISP_H`.
+7. Crop math in `handleApplyCrop` unchanged — `cx/cy` calculation is frame-relative and still correct.
+
+**Deviations:** None.
+
+---
+
+## 2026-05-07 (session 4) — ThemeScreen no-scroll layout
+
+**Plan:** Reorganize ThemeScreen so the preview is always visible. Replace single vertical scroll with three horizontal tabs (Themes / Fonts / Palette) below the preview.
+
+**Steps completed:**
+1. Rewrote `ThemeScreen.tsx`: removed outer `ScrollView`; preview always visible at top (38% screen height, scale calculated from available space).
+2. Three-tab bar (Themes / Fonts / Palette) replaces the stacked sections.
+3. Themes tab: horizontal `ScrollView` of theme cards.
+4. Fonts tab: category row + font picker + size stepper — all fits vertically without scrolling.
+5. Palette tab: 4-swatch color grid.
+6. No vertical scrolling anywhere — preview stays on screen while user tweaks any setting.
+
+**Deviations:** None.
+
+---
+
+## 2026-05-07 (session 3) — Fix font reactivity in preview; improve native card design
+
+**Plan:** Font changes for birthday/anniversary/milestone not reflecting in JS theme preview. Native card boxes look plain. Fix both.
+
+**Steps completed:**
+1. `MilestoneBubble.tsx`: removed `fontFamily`/`sizeOffset` props; component now calls `useFontSettings()` directly for 'birthday' category — same reactive pattern as Clock.
+2. `MilestoneCard.tsx`: same pattern for 'milestone' category.
+3. `LockscreenPreview.tsx` / `AnniversaryCard`: same pattern for 'anniversary' category. Dropped unused `bdFont`/`annFont`/`msFont` variables and stale prop passing.
+4. Native `cardBackground()`: replaced flat `Color.argb(180)` with top-to-bottom gradient (`210→170` alpha), `cornerRadius` 16→20dp, border alpha 30→70 for dark themes / 40 for light. Returns `LayerDrawable` (gradient + border). Updated all 4 call sites with `isLight` flag.
+5. Synced `LockscreenActivity.kt` staging → production.
+
+**Deviations:** None.
+
+---
+
+## 2026-05-07 (session 2) — Remove duplicate widgets; fix font propagation to overlay
+
+**Plan:** Remove duplicate battery+weather from top of lockscreen (JS + native). Fix font applying to all card texts in native (synthetic BOLD was overriding custom font). Wire fontSettings to native overlay via AppNavigator.
+
+**Steps completed:**
+1. Removed unused `BatteryWidget` import from `LockscreenPreview.tsx` (top row already deleted in prior session).
+2. Removed "Top row: Battery & Weather" block from `android-src-staging/LockscreenActivity.kt`.
+3. Fixed synthetic BOLD on custom fonts in native: `setTypeface(catTypeface, Typeface.BOLD)` → `typeface = catTypeface` for all card builder TextViews (birthday label, milestone day count, time elapsed, annual cycle, next event, battery widget text, pill text).
+4. Updated `AppNavigator.tsx`: imported `useFontSettings`, added `fontSettings` to syncData call and dependency array so native overlay always gets current per-category font settings.
+5. Synced `android-src-staging/LockscreenActivity.kt` → production `android/app/…/LockscreenActivity.kt`.
+
+**Deviations:** None.
+
+---
+
+## 2026-05-07 — Font system, UI cleanup
+
+**Plan:** Font picker (8 fonts) in ThemeScreen + Settings. Clock uses selected font. Native overlay respects font. Remove "›" from Active Theme in Settings. Change "Edit" → "Change" in HomeScreen.
+
+**Steps completed:**
+1. Downloaded 5 new TTF fonts (BebasNeue, Orbitron, PlayfairDisplay, Raleway, JosefinSans) to `assets/fonts/` and `android/app/src/main/assets/fonts/`.
+2. Copied SpaceMono_700Bold.ttf and SpaceGrotesk_700Bold.ttf from node_modules to both font directories.
+3. Created `src/constants/fonts.ts` — FontId type, FONTS array (8 entries with clockSize/clockTracking), getFontDef helper.
+4. Updated `useTheme.ts` — added fontId/setFontId to context interface.
+5. Updated `useThemeProvider.ts` — fontId state persisted to AsyncStorage (`theme_font`).
+6. Updated `App.tsx` — 5 new fonts loaded via useFonts with require() from assets/fonts/.
+7. Updated `Clock.tsx` — reads fontId from useTheme, applies fontFamily/fontWeight/clockSize/clockTracking dynamically.
+8. Updated `ThemeScreen.tsx` — added horizontal "Clock Font" strip between Palette and Available Themes; shows "12:34" preview in each font.
+9. Updated `SettingsScreen.tsx` — removed "›" from Active Theme row; Font Style row now shows current font name and navigates to ThemeScreen.
+10. Updated `HomeScreen.tsx` — "Edit" button → "Change".
+11. Updated `useOverlay.ts` — fontId added as 8th param of syncData, written to themeJson as `fontId`.
+12. Updated `AppNavigator.tsx` — passes fontId to overlay.syncData.
+13. Updated `android-src-staging/LockscreenModule.kt` — persists `font_id` from themeJson to SharedPreferences.
+14. Updated `android-src-staging/LockscreenActivity.kt` — reads `font_id` from prefs, added `loadClockTypeface()` helper, clock + AM/PM TextViews use selected typeface.
+15. Synced both Kotlin files to production `android/app/src/main/java/com/informatheme/app/`.
+
+**Deviations:** None.
+
+---
+
 ## 2026-05-06 — Wallpaper system: device gallery, crop, filters, preview
 
 **Plan:** Implement full custom wallpaper workflow — pick from device gallery, crop to phone aspect ratio, apply color filters, preview on lockscreen, persist selection.

@@ -189,7 +189,7 @@ export function HomeScreen() {
                 className="px-4 py-2 rounded-xl"
                 style={{ backgroundColor: colors.accent }}
               >
-                <Text className="text-sm font-bold" style={{ color: colors.bg }}>Edit</Text>
+                <Text className="text-sm font-bold" style={{ color: colors.bg }}>Change</Text>
               </TouchableOpacity>
             </View>
             <View className="flex-row items-center justify-between mt-4">

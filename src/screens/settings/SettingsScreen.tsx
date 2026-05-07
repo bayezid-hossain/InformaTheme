@@ -4,6 +4,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Sharing from 'expo-sharing';
 import { AlertTriangle, Battery, Cloud, Download, Folder, ImagePlus, Info, Lock, MapPin, Palette, PenTool, Share2, Smartphone, User, Zap } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { getFontDef } from '../../constants/fonts';
 import React from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,13 +17,14 @@ import { useWeather } from '../../hooks/useWeather';
 import { loadDatesFromDb } from '../../services/db';
 
 export function SettingsScreen() {
-  const { colors, variant } = useTheme();
+  const { colors, variant, fontId } = useTheme();
+  const navigation = useNavigation<any>();
   const perms = usePermissions();
   const { refresh: refreshWeather } = useWeather();
   const { persist } = useDates();
   const [locationGranted, setLocationGranted] = React.useState<boolean>(false);
   const [mediaGranted, setMediaGranted] = React.useState<boolean>(false);
-  const themeLabel = {
+  const themeLabel: Record<string, string> = {
     darkPremium: 'Dark Premium',
     warmLight: 'Warm Light',
     glassmorphism: 'Glassmorphism',
@@ -29,8 +32,14 @@ export function SettingsScreen() {
     softSage: 'Soft Sage',
     midnightStars: 'Midnight Stars',
     oceanDive: 'Ocean Dive',
-    warmEarth: 'Warm Earth'
-  }[variant] || 'Dark Premium';
+    warmEarth: 'Warm Earth',
+    onyxGold: 'Onyx & Gold',
+    royalAmethyst: 'Royal Amethyst',
+    roseQuartz: 'Rose Quartz',
+    cobaltNight: 'Cobalt Night',
+  };
+  const activethemeLabel = themeLabel[variant] || 'Dark Premium';
+  const currentFont = getFontDef(fontId);
 
   React.useEffect(() => {
     Location.getForegroundPermissionsAsync().then(({ status }) => {
@@ -251,17 +260,16 @@ export function SettingsScreen() {
         {/* App */}
         <Text className="text-[11px] font-bold tracking-[1.2px] mb-2.5 px-1" style={{ color: colors.text3 }}>APP</Text>
         <View className="rounded-2xl border overflow-hidden" style={{ backgroundColor: colors.bg2, borderColor: colors.border }}>
-          <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
+          <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3" onPress={() => navigation.navigate('Theme')}>
             <View className="w-6 items-center"><Palette size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Active Theme</Text>
-            <Text className="text-[13px]" style={{ color: colors.text3 }}>{themeLabel}</Text>
-            <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
+            <Text className="text-[13px]" style={{ color: colors.text3 }}>{activethemeLabel}</Text>
           </TouchableOpacity>
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />
-          <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3">
+          <TouchableOpacity className="flex-row items-center px-4 py-3.5 gap-3" onPress={() => navigation.navigate('Theme')}>
             <View className="w-6 items-center"><PenTool size={20} color={colors.text} /></View>
             <Text className="flex-1 text-[15px]" style={{ color: colors.text }}>Font Style</Text>
-            <Text className="text-[13px]" style={{ color: colors.text3 }}>Space Grotesk</Text>
+            <Text className="text-[13px]" style={{ color: colors.text3 }}>{currentFont.name}</Text>
             <Text className="text-lg ml-1" style={{ color: colors.text3 }}>›</Text>
           </TouchableOpacity>
           <View className="h-px ml-[52px]" style={{ backgroundColor: colors.border }} />

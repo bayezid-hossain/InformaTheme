@@ -10,6 +10,10 @@ interface Props {
   trackColor?: string;
   label?: string;
   sublabel?: string;
+  fontFamily?: string;
+  sizeOffset?: number;
+  textColor?: string;
+  sublabelColor?: string;
 }
 
 export function ProgressRing({
@@ -20,6 +24,10 @@ export function ProgressRing({
   trackColor = 'rgba(255,255,255,0.15)',
   label,
   sublabel,
+  fontFamily,
+  sizeOffset = 0,
+  textColor = 'rgba(255,255,255,0.75)',
+  sublabelColor = '#fff',
 }: Props) {
   const radius = (size - strokeWidth * 2) / 2;
   const circ = 2 * Math.PI * radius;
@@ -42,12 +50,12 @@ export function ProgressRing({
         </Svg>
         {sublabel && (
           <View className="absolute inset-0 items-center justify-center">
-            <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>{sublabel}</Text>
+            <Text style={{ fontSize: 11 + sizeOffset, color: sublabelColor, ...(fontFamily ? { fontFamily } : { fontWeight: '700' }) }}>{sublabel}</Text>
           </View>
         )}
       </View>
       {label && (
-        <Text style={{ fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.75)', textAlign: 'center', maxWidth: size }}>
+        <Text style={{ fontSize: 9 + sizeOffset, color: textColor, textAlign: 'center', maxWidth: size, ...(fontFamily ? { fontFamily } : { fontWeight: '600' }) }}>
           {label}
         </Text>
       )}

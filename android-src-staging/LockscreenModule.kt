@@ -74,6 +74,8 @@ class LockscreenModule(private val reactContext: ReactApplicationContext) :
                 .putString("widgets", theme.optJSONArray("widgets")?.toString() ?: "[\"clock\",\"milestone\",\"anniversary\",\"birthday\",\"weather\"]")
                 .putString("wallpaper", theme.optString("wallpaper", "wp_dark_premium"))
                 .putString("wallpaper_filter", theme.optString("wallpaperFilter", "original"))
+                .putString("font_id", theme.optString("fontId", "stencil"))
+                .putString("font_settings", theme.optJSONObject("fontSettings")?.toString() ?: "")
                 .putString("dates", datesJson)
                 .apply()
 

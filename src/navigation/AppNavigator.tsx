@@ -12,15 +12,17 @@ import { useDates } from '../context/DateStoreContext';
 import { useOverlay } from '../hooks/useOverlay';
 import { useWeather } from '../hooks/useWeather';
 import { useWidgetStore } from '../hooks/useWidgetStore';
+import { useFontSettings } from '../hooks/useFontSettings';
 
 const Stack = createNativeStackNavigator();
 
 export function AppNavigator() {
-  const { colors, variant, customWallpaper, selectedWallpaper } = useTheme();
+  const { colors, variant, customWallpaper, selectedWallpaper, fontId } = useTheme();
   const { dates } = useDates();
   const { weather } = useWeather();
   const overlay = useOverlay();
   const { widgets } = useWidgetStore();
+  const { settings: fontSettings } = useFontSettings();
 
   const weatherStr = weather.location ? `WEATHER ${weather.temp}°C (${weather.location})` : '';
   const enabledWidgetIdsStr = React.useMemo(() => {
@@ -37,8 +39,8 @@ export function AppNavigator() {
         finalWp = `wp_${wpOverride.replace(/([A-Z])/g, '_$1').toLowerCase()}`;
     }
 
-    overlay.syncData(variant, colors, dates, weatherStr, enabledWidgetIdsStr.split(','), finalWp, wpFilter);
-  }, [variant, colors, dates, weatherStr, enabledWidgetIdsStr, customWallpaper, selectedWallpaper, overlay.syncData]);
+    overlay.syncData(variant, colors, dates, weatherStr, enabledWidgetIdsStr.split(','), finalWp, wpFilter, fontId, fontSettings);
+  }, [variant, colors, dates, weatherStr, enabledWidgetIdsStr, customWallpaper, selectedWallpaper, fontId, fontSettings, overlay.syncData]);
 
   return (
     <Stack.Navigator

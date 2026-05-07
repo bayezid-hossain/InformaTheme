@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-
-type ClockStyle = 'stencil' | 'mono' | 'bold';
+import { useTheme } from '../hooks/useTheme';
+import { getFontDef } from '../constants/fonts';
+import { useFontSettings } from '../hooks/useFontSettings';
 
 interface Props {
-  style?: ClockStyle;
   color?: string;
   size?: number;
 }
@@ -18,50 +18,33 @@ function useLiveClock() {
     const minutes = pad(d.getMinutes());
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
+    hours = hours ? hours : 12;
     return { h: hours.toString(), m: minutes, ampm };
   };
 
   const [time, setTime] = useState(getFormattedTime());
   useEffect(() => {
-    const id = setInterval(() => {
-      setTime(getFormattedTime());
-    }, 1000);
+    const id = setInterval(() => setTime(getFormattedTime()), 1000);
     return () => clearInterval(id);
   }, []);
   return time;
 }
 
-const FONT_MAP: Record<ClockStyle, string> = {
-  stencil: 'SirinStencil_400Regular',
-  mono: 'SpaceMono_700Bold',
-  bold: 'SpaceGrotesk_700Bold',
-};
-
-const SIZE_MAP: Record<ClockStyle, number> = {
-  stencil: 68,
-  mono: 60,
-  bold: 64,
-};
-
-const TRACKING_MAP: Record<ClockStyle, number> = {
-  stencil: 2,
-  mono: -2,
-  bold: -3,
-};
-
-export function Clock({ style = 'stencil', color = '#ffffff', size }: Props) {
+export function Clock({ color = '#ffffff', size }: Props) {
+  const { settings } = useFontSettings();
+  const font = getFontDef(settings.clock.fontId);
   const { h, m, ampm } = useLiveClock();
-  const fontSize = size ?? SIZE_MAP[style];
+  const fontSize = (size ?? font.clockSize) + settings.clock.sizeOffset;
 
   return (
     <View className="items-center flex-row">
       <Text
         style={{
-          fontFamily: FONT_MAP[style],
+          fontFamily: font.fontFamily,
+          fontWeight: font.fontWeight as any,
           fontSize,
           color,
-          letterSpacing: TRACKING_MAP[style],
+          letterSpacing: font.clockTracking,
           lineHeight: fontSize,
         }}
       >
@@ -69,7 +52,8 @@ export function Clock({ style = 'stencil', color = '#ffffff', size }: Props) {
       </Text>
       <Text
         style={{
-          fontFamily: FONT_MAP[style],
+          fontFamily: font.fontFamily,
+          fontWeight: font.fontWeight as any,
           fontSize: fontSize * 0.25,
           color,
           marginLeft: 4,

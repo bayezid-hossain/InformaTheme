@@ -13,6 +13,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -102,8 +103,11 @@ class LockscreenActivity : Activity() {
         val weather     = prefs.getString("weather", "") ?: ""
         val datesJson   = prefs.getString("dates", "[]") ?: "[]"
         val widgetsJson = prefs.getString("widgets", "[\"clock\",\"battery\",\"milestone\",\"anniversary\",\"birthday\",\"weather\"]") ?: "[\"clock\",\"battery\",\"milestone\",\"anniversary\",\"birthday\",\"weather\"]"
+        val fontId      = prefs.getString("font_id", "stencil") ?: "stencil"
+        val fontSettingsJson = prefs.getString("font_settings", "") ?: ""
+        val fontSettingsMap  = parseFontSettings(fontSettingsJson)
         setContentView(buildOverlayView(variant, bgColor, bg1Color, bg2Color,
-            textColor, text2Color, text3Color, accentColor, tagline, weather, datesJson, widgetsJson, wallpaper, wallpaperFilter))
+            textColor, text2Color, text3Color, accentColor, tagline, weather, datesJson, widgetsJson, wallpaper, wallpaperFilter, fontId, fontSettingsMap))
         updateBatteryUI()
     }
 
@@ -262,11 +266,52 @@ class LockscreenActivity : Activity() {
 
     // ── Main UI builder ───────────────────────────────────────────────────────
 
+    private fun loadClockTypeface(fontId: String): Typeface {
+        val assetFile = when (fontId) {
+            "mono"     -> "fonts/SpaceMono_700Bold.ttf"
+            "modern"   -> "fonts/SpaceGrotesk_700Bold.ttf"
+            "bebas"    -> "fonts/BebasNeue_400Regular.ttf"
+            "orbitron" -> "fonts/Orbitron_700Bold.ttf"
+            "playfair" -> "fonts/PlayfairDisplay_700Bold.ttf"
+            "raleway"  -> "fonts/Raleway_300Light.ttf"
+            "josefin"  -> "fonts/JosefinSans_600SemiBold.ttf"
+            else       -> "fonts/SirinStencil_400Regular.ttf"
+        }
+        return try {
+            Typeface.createFromAsset(assets, assetFile)
+        } catch (_: Exception) {
+            Typeface.create("sans-serif-condensed", Typeface.BOLD)
+        }
+    }
+
+    data class FontCategorySetting(val fontId: String = "modern", val sizeOffset: Int = 0)
+
+    private fun parseFontSettings(json: String): Map<String, FontCategorySetting> {
+        val result = mutableMapOf<String, FontCategorySetting>()
+        if (json.isEmpty()) return result
+        try {
+            val obj = org.json.JSONObject(json)
+            for (key in listOf("clock", "birthday", "anniversary", "milestone", "others")) {
+                if (obj.has(key)) {
+                    val cat = obj.getJSONObject(key)
+                    result[key] = FontCategorySetting(
+                        fontId = cat.optString("fontId", "modern"),
+                        sizeOffset = cat.optInt("sizeOffset", 0)
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("LockscreenActivity", "parseFontSettings: ${e.message}")
+        }
+        return result
+    }
+
     private fun buildOverlayView(
         variant: String, bgColor: Int, bg1Color: Int, bg2Color: Int,
         textColor: Int, text2Color: Int, text3Color: Int,
         accentColor: Int, tagline: String, weather: String, datesJson: String, widgetsJson: String,
-        wallpaper: String, wallpaperFilter: String = "original"
+        wallpaper: String, wallpaperFilter: String = "original", fontId: String = "stencil",
+        fontSettingsMap: Map<String, FontCategorySetting> = emptyMap()
     ): View {
         val enabledWidgets = mutableSetOf<String>()
         try {
@@ -275,6 +320,16 @@ class LockscreenActivity : Activity() {
         } catch (_: Exception) {
             enabledWidgets.addAll(listOf("clock", "battery", "milestone", "anniversary", "birthday", "weather"))
         }
+
+        // Per-category fonts
+        val bdSetting  = fontSettingsMap["birthday"]  ?: FontCategorySetting()
+        val annSetting = fontSettingsMap["anniversary"] ?: FontCategorySetting()
+        val msSetting  = fontSettingsMap["milestone"] ?: FontCategorySetting()
+        val otSetting  = fontSettingsMap["others"]    ?: FontCategorySetting()
+        val bdTypeface  = loadClockTypeface(bdSetting.fontId)
+        val annTypeface = loadClockTypeface(annSetting.fontId)
+        val msTypeface  = loadClockTypeface(msSetting.fontId)
+        val otTypeface  = loadClockTypeface(otSetting.fontId)
 
         val ctx = this
         val MP  = ViewGroup.LayoutParams.MATCH_PARENT
@@ -293,15 +348,14 @@ class LockscreenActivity : Activity() {
             resId != 0 -> {
                 root.addView(ImageView(ctx).apply {
                     setImageResource(resId)
-                    scaleType = ImageView.ScaleType.FIT_XY
+                    scaleType = ImageView.ScaleType.CENTER_CROP
                     layoutParams = FrameLayout.LayoutParams(MP, MP)
                 })
                 root.addView(View(ctx).apply {
                     setBackgroundColor(if (isLight) Color.argb(30, 255, 255, 255) else Color.argb(120, 0, 0, 0))
                     layoutParams = FrameLayout.LayoutParams(MP, MP)
                 })
-                addBackgroundShapes(ctx, root, variant, density)
-            }
+                            }
             isCustomUri -> {
                 val bmp = loadBitmapFromUri(wallpaper)
                 if (bmp != null) {
@@ -314,8 +368,7 @@ class LockscreenActivity : Activity() {
                         setBackgroundColor(if (isLight) Color.argb(30, 255, 255, 255) else Color.argb(100, 0, 0, 0))
                         layoutParams = FrameLayout.LayoutParams(MP, MP)
                     })
-                    addBackgroundShapes(ctx, root, variant, density)
-                    filterOverlayColor(wallpaperFilter)?.let { (color, opacity) ->
+                                        filterOverlayColor(wallpaperFilter)?.let { (color, opacity) ->
                         root.addView(View(ctx).apply {
                             val alpha = (opacity * 255).toInt()
                             setBackgroundColor(Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)))
@@ -324,13 +377,11 @@ class LockscreenActivity : Activity() {
                     }
                 } else {
                     root.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(bgColor, bg1Color, bg2Color))
-                    addBackgroundShapes(ctx, root, variant, density)
-                }
+                                    }
             }
             else -> {
                 root.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(bgColor, bg1Color, bg2Color))
-                addBackgroundShapes(ctx, root, variant, density)
-            }
+                            }
         }
 
         batteryTexts.clear()
@@ -358,8 +409,9 @@ class LockscreenActivity : Activity() {
             val dateFmt = SimpleDateFormat("EEE MM-dd", Locale.getDefault())
             content.addView(TextView(ctx).apply {
                 text = "${dateFmt.format(Date()).uppercase()} ▼ $tagline ▼"
-                setTextColor(textColor); textSize = 10f * scale; letterSpacing = 0.15f
-                gravity = Gravity.CENTER; setTypeface(typeface, Typeface.BOLD)
+                setTextColor(textColor); textSize = (10f + otSetting.sizeOffset) * scale; letterSpacing = 0.15f
+                gravity = Gravity.CENTER
+                if (otTypeface != null) setTypeface(otTypeface, Typeface.BOLD) else setTypeface(typeface, Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dpScale(2) }
             })
 
@@ -367,15 +419,15 @@ class LockscreenActivity : Activity() {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dpScale(20) }
                 
+                val clockSetting = fontSettingsMap["clock"]
+                val clockFontId = clockSetting?.fontId ?: fontId
+                val clockSizeOff = clockSetting?.sizeOffset ?: 0
+                val clockTypeface = loadClockTypeface(clockFontId)
                 // Hour:Minute
                 addView(TextView(ctx).apply {
                     text = SimpleDateFormat("h:mm", Locale.getDefault()).format(Date())
-                    setTextColor(textColor); textSize = 78f * scale
-                    try {
-                        typeface = Typeface.createFromAsset(ctx.assets, "fonts/SirinStencil_400Regular.ttf")
-                    } catch (_: Exception) {
-                        typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
-                    }
+                    setTextColor(textColor); textSize = (78f + clockSizeOff) * scale
+                    typeface = clockTypeface
                     gravity = Gravity.CENTER
                     letterSpacing = 0.02f
                     layoutParams = LinearLayout.LayoutParams(WC, WC)
@@ -384,12 +436,8 @@ class LockscreenActivity : Activity() {
                 // AM/PM
                 addView(TextView(ctx).apply {
                     text = SimpleDateFormat("a", Locale.getDefault()).format(Date())
-                    setTextColor(textColor); textSize = 18f * scale; alpha = 0.8f
-                    try {
-                        typeface = Typeface.createFromAsset(ctx.assets, "fonts/SirinStencil_400Regular.ttf")
-                    } catch (_: Exception) {
-                        typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
-                    }
+                    setTextColor(textColor); textSize = (18f + clockSizeOff) * scale; alpha = 0.8f
+                    typeface = clockTypeface
                     layoutParams = LinearLayout.LayoutParams(WC, WC).apply { 
                         marginStart = dpScale(4); bottomMargin = dpScale(12) 
                     }
@@ -406,18 +454,18 @@ class LockscreenActivity : Activity() {
 
         if (enabledWidgets.contains("birthday") && birthdays.isNotEmpty())
             content.addView(buildCarousel(
-                birthdays.mapIndexed { i, it -> buildBirthdayCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color, i == 0) }
+                birthdays.mapIndexed { i, it -> buildBirthdayCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color, variant, i == 0, bdTypeface, bdSetting.sizeOffset) }
             ))
 
         if (enabledWidgets.contains("anniversary") && anniversaries.isNotEmpty())
             content.addView(buildCarousel(
-                anniversaries.mapIndexed { i, it -> buildAnniversaryCard(ctx, it, accentColor, bg1Color, textColor, text3Color, i == 0) },
+                anniversaries.mapIndexed { i, it -> buildAnniversaryCard(ctx, it, accentColor, bg1Color, textColor, text3Color, variant, i == 0, annTypeface, annSetting.sizeOffset) },
                 narrow = true
             ))
 
         if (enabledWidgets.contains("milestone") && milestones.isNotEmpty())
             content.addView(buildCarousel(
-                milestones.mapIndexed { i, it -> buildMilestoneCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color, i == 0) }
+                milestones.mapIndexed { i, it -> buildMilestoneCard(ctx, it, accentColor, bg1Color, textColor, text2Color, text3Color, variant, i == 0, msTypeface, msSetting.sizeOffset) }
             ))
 
         // Upcoming chips ≤30 days
@@ -434,9 +482,16 @@ class LockscreenActivity : Activity() {
                     bottomMargin = dpScale(16); marginStart = dpScale(20); marginEnd = dpScale(20)
                 }
             }
+            col.addView(TextView(ctx).apply {
+                text = "UPCOMING EVENTS"; setTextColor(text2Color); textSize = (11f + otSetting.sizeOffset) * scale; letterSpacing = 0.05f
+                if (otTypeface != null) setTypeface(otTypeface, Typeface.BOLD) else setTypeface(typeface, Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dpScale(10) }
+            })
             upcoming.forEach { d ->
                 val emoji = if (d.type == "birthday") "🎂" else "💍"
-                col.addView(buildPill(ctx, "${d.label}: ${d.daysUntilNext} Days $emoji", textColor, variant).apply {
+                val tFace = if (d.type == "birthday") bdTypeface else annTypeface
+                val sOff  = if (d.type == "birthday") bdSetting.sizeOffset else annSetting.sizeOffset
+                col.addView(buildPill(ctx, "${d.label}: ${d.daysUntilNext} Days $emoji", textColor, variant, bg1Color, tFace, sOff).apply {
                     (layoutParams as LinearLayout.LayoutParams).bottomMargin = dpScale(6)
                 })
             }
@@ -448,8 +503,8 @@ class LockscreenActivity : Activity() {
             "The present is a gift.", "Growth takes patience.", "Moments become memories.")
         content.addView(TextView(ctx).apply {
             text = "\"${quotes[Calendar.getInstance().get(Calendar.DAY_OF_YEAR) % quotes.size]}\""
-            setTextColor(text3Color); textSize = 13f * scale; gravity = Gravity.CENTER
-            setTypeface(typeface, Typeface.ITALIC)
+            setTextColor(text3Color); textSize = (13f + otSetting.sizeOffset) * scale; gravity = Gravity.CENTER
+            if (otTypeface != null) setTypeface(otTypeface, Typeface.ITALIC) else setTypeface(typeface, Typeface.ITALIC)
             layoutParams = LinearLayout.LayoutParams(MP, WC).apply {
                 topMargin = dpScale(4); bottomMargin = dpScale(20)
                 marginStart = dpScale(20); marginEnd = dpScale(20)
@@ -465,10 +520,11 @@ class LockscreenActivity : Activity() {
         }
         val dayOfWeek = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date()).uppercase()
         val todayStr = "TODAY, $dayOfWeek"
-        pillsCol.addView(buildPill(ctx, todayStr, textColor, variant).apply {
+        pillsCol.addView(buildPill(ctx, todayStr, textColor, variant, bg1Color, otTypeface, otSetting.sizeOffset).apply {
             (layoutParams as LinearLayout.LayoutParams).bottomMargin = dpScale(8)
         })
-        if (enabledWidgets.contains("weather") && weather.isNotEmpty()) pillsCol.addView(buildPill(ctx, weather, textColor, variant))
+        if (enabledWidgets.contains("weather") && weather.isNotEmpty()) 
+            pillsCol.addView(buildPill(ctx, weather, textColor, variant, bg1Color, otTypeface, otSetting.sizeOffset))
         content.addView(pillsCol)
 
         // Unlock slider
@@ -476,7 +532,7 @@ class LockscreenActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(MP, WC).apply {
                 marginStart = dpScale(20); marginEnd = dpScale(20)
             }
-            addView(buildUnlockSlider(ctx, accentColor, text3Color, variant))
+            addView(buildUnlockSlider(ctx, accentColor, text3Color, variant, otTypeface, otSetting.sizeOffset))
         })
 
         scroll.addView(content)
@@ -593,55 +649,75 @@ class LockscreenActivity : Activity() {
         return container
     }
 
-    private fun cardBackground(bg1Color: Int, highlightColor: Int? = null): GradientDrawable = GradientDrawable().apply {
-        setColor(Color.argb(180, Color.red(bg1Color), Color.green(bg1Color), Color.blue(bg1Color)))
-        cornerRadius = dp(16).toFloat()
-        if (highlightColor != null) {
-            setStroke(dp(2), highlightColor)
-        } else {
-            setStroke(dp(1), Color.argb(30, 255, 255, 255))
+    private fun cardBackground(bg1Color: Int, highlightColor: Int? = null, isLight: Boolean = false): LayerDrawable {
+        val r = Color.red(bg1Color); val g = Color.green(bg1Color); val b = Color.blue(bg1Color)
+        val grad = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(Color.argb(215, r, g, b), Color.argb(170, r, g, b))
+        ).apply { cornerRadius = dp(20).toFloat() }
+
+        val border = GradientDrawable().apply {
+            setColor(Color.TRANSPARENT)
+            cornerRadius = dp(20).toFloat()
+            if (highlightColor != null) {
+                setStroke(dp(2), highlightColor)
+            } else {
+                val strokeAlpha = if (isLight) 40 else 70
+                val sc = if (isLight) Color.argb(strokeAlpha, 0, 0, 0) else Color.argb(strokeAlpha, 255, 255, 255)
+                setStroke(dp(1), sc)
+            }
         }
+        return LayerDrawable(arrayOf(grad, border))
     }
 
     private fun buildBirthdayCard(
         ctx: Context, bd: DateEntry,
         accentColor: Int, bg1Color: Int,
         textColor: Int, text2Color: Int, text3Color: Int,
-        isHighlighted: Boolean = false
+        variant: String,
+        isHighlighted: Boolean = false,
+        catTypeface: Typeface? = null,
+        catSizeOffset: Int = 0
     ): View {
         val MP = ViewGroup.LayoutParams.MATCH_PARENT
         val WC = ViewGroup.LayoutParams.WRAP_CONTENT
         return LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(16))
-            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null)
+            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null, variant == "warmLight" || variant == "softSage")
 
             addView(TextView(ctx).apply {
                 text = "• Born ${bd.originalDateStr} (${"%,d".format(bd.daysSince)} days ago) ${bd.icon}"
-                setTextColor(accentColor); textSize = 10.5f; letterSpacing = 0.03f
+                setTextColor(accentColor); textSize = 10.5f + catSizeOffset; letterSpacing = 0.03f
+                if (catTypeface != null) typeface = catTypeface
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(6) }
             })
             addView(TextView(ctx).apply {
                 text = bd.label
-                setTextColor(textColor); textSize = 15f
-                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(textColor); textSize = 15f + catSizeOffset
+                if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
             })
             addView(TextView(ctx).apply {
                 text = "Age: ${bd.years}y ${bd.months}m ${bd.daysRemainder}d"
-                setTextColor(text2Color); textSize = 12f
+                setTextColor(text2Color); textSize = 12f + catSizeOffset
+                if (catTypeface != null) typeface = catTypeface
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(8) }
             })
             // Divider
             addView(View(ctx).apply {
-                layoutParams = LinearLayout.LayoutParams(MP, dp(1)).apply { bottomMargin = dp(8) }
-                setBackgroundColor(Color.argb(20, 255, 255, 255))
+                layoutParams = LinearLayout.LayoutParams(MP, dp(1)).apply { 
+                    marginStart = dp(2); marginEnd = dp(2); topMargin = dp(8); bottomMargin = dp(8) 
+                }
+                val dividerColor = if (variant == "warmLight" || variant == "softSage") Color.argb(30, 0, 0, 0) else Color.argb(30, 255, 255, 255)
+                setBackgroundColor(dividerColor)
             })
             bd.daysUntilNext?.let { until ->
                 addView(TextView(ctx).apply {
                     val labelPrefix = if (bd.type == "birthday") "Next Birthday" else "Next Event"
                     text = "$labelPrefix: ${bd.nextMonths}m ${bd.nextDays}d ($until Days)"
-                    setTextColor(text3Color); textSize = 11f; letterSpacing = 0.05f
+                    setTextColor(text3Color); textSize = 11f + catSizeOffset; letterSpacing = 0.05f
+                    if (catTypeface != null) typeface = catTypeface
                     layoutParams = LinearLayout.LayoutParams(MP, WC)
                 })
             }
@@ -652,7 +728,10 @@ class LockscreenActivity : Activity() {
         ctx: Context, ann: DateEntry,
         accentColor: Int, bg1Color: Int,
         textColor: Int, text3Color: Int,
-        isHighlighted: Boolean = false
+        variant: String,
+        isHighlighted: Boolean = false,
+        catTypeface: Typeface? = null,
+        catSizeOffset: Int = 0
     ): View {
         val MP = ViewGroup.LayoutParams.MATCH_PARENT
         val WC = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -664,24 +743,27 @@ class LockscreenActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(12), dp(16), dp(12), dp(16))
-            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null)
+            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null, variant == "warmLight" || variant == "softSage")
 
-            addView(buildCircleRing(ctx, circleSize, prog, accentColor, lbl, ann.label, textColor).apply {
+            addView(buildCircleRing(ctx, circleSize, prog, accentColor, lbl, ann.label, textColor, catTypeface, catSizeOffset).apply {
                 layoutParams = LinearLayout.LayoutParams(WC, WC).apply { gravity = Gravity.CENTER_HORIZONTAL }
             })
             ann.daysUntilNext?.let { until ->
                 addView(View(ctx).apply {
                     layoutParams = LinearLayout.LayoutParams(MP, dp(1)).apply { topMargin = dp(10); bottomMargin = dp(8) }
-                    setBackgroundColor(Color.argb(20, 255, 255, 255))
+                    val dividerColor = if (variant == "warmLight" || variant == "softSage") Color.argb(30, 0, 0, 0) else Color.argb(20, 255, 255, 255)
+                    setBackgroundColor(dividerColor)
                 })
                 addView(TextView(ctx).apply {
                     text = "Since: ${ann.originalDateStr}"
-                    setTextColor(text3Color); textSize = 8.5f; gravity = Gravity.CENTER
+                    setTextColor(text3Color); textSize = 8.5f + catSizeOffset; gravity = Gravity.CENTER
+                    if (catTypeface != null) typeface = catTypeface
                     layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(2) }
                 })
                 addView(TextView(ctx).apply {
                     text = "Next: ${ann.nextMonths}m ${ann.nextDays}d"
-                    setTextColor(text3Color); textSize = 9f; gravity = Gravity.CENTER
+                    setTextColor(text3Color); textSize = 9f + catSizeOffset; gravity = Gravity.CENTER
+                    if (catTypeface != null) typeface = catTypeface
                     layoutParams = LinearLayout.LayoutParams(MP, WC)
                 })
             }
@@ -692,7 +774,10 @@ class LockscreenActivity : Activity() {
         ctx: Context, ms: DateEntry,
         accentColor: Int, bg1Color: Int,
         textColor: Int, text2Color: Int, text3Color: Int,
-        isHighlighted: Boolean = false
+        variant: String,
+        isHighlighted: Boolean = false,
+        catTypeface: Typeface? = null,
+        catSizeOffset: Int = 0
     ): View {
         val MP   = ViewGroup.LayoutParams.MATCH_PARENT
         val WC   = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -702,26 +787,27 @@ class LockscreenActivity : Activity() {
         return LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(16))
-            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null)
+            background = cardBackground(bg1Color, if (isHighlighted) accentColor else null, variant == "warmLight" || variant == "softSage")
 
             // Label & Date
             addView(TextView(ctx).apply {
                 text = "${ms.label.uppercase()} (${ms.originalDateStr})"
-                setTextColor(text2Color); textSize = 10.5f; letterSpacing = 0.05f
+                setTextColor(text2Color); textSize = 10.5f + catSizeOffset; letterSpacing = 0.05f
+                if (catTypeface != null) typeface = catTypeface
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
             })
             // Main Days Count
             addView(TextView(ctx).apply {
                 text = "${"%,d".format(ms.daysSince)} Days Ago"
-                setTextColor(textColor); textSize = 22f
-                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(textColor); textSize = 22f + catSizeOffset
+                if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(4) }
             })
             // Years, Months, Days breakdown
             addView(TextView(ctx).apply {
                 text = "Time Elapsed: ${ms.years}y ${ms.months}m ${ms.daysRemainder}d"
-                setTextColor(Color.argb(220, 255, 255, 255)); textSize = 12.5f
-                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(text2Color); textSize = 12.5f + catSizeOffset
+                if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(MP, WC).apply { bottomMargin = dp(12) }
             })
             // Progress Bar Labels (Horizontal row)
@@ -731,13 +817,15 @@ class LockscreenActivity : Activity() {
                 // Left percentage
                 addView(TextView(ctx).apply {
                     text = "Annual Cycle: $percent%"
-                    setTextColor(text3Color); textSize = 9.5f; setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(text3Color); textSize = 9.5f + catSizeOffset
+                    if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
                     layoutParams = LinearLayout.LayoutParams(0, WC, 1f)
                 })
                 // Right remaining time
                 addView(TextView(ctx).apply {
                     text = "${ms.nextMonths}m ${ms.nextDays}d left"
-                    setTextColor(text3Color); textSize = 9.5f; setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(text3Color); textSize = 9.5f + catSizeOffset
+                    if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
                     gravity = Gravity.END
                     layoutParams = LinearLayout.LayoutParams(WC, WC)
                 })
@@ -765,7 +853,8 @@ class LockscreenActivity : Activity() {
 
     private fun buildCircleRing(
         ctx: Context, sizePx: Int, progress: Float,
-        accentColor: Int, centerText: String, label: String, textColor: Int
+        accentColor: Int, centerText: String, label: String, textColor: Int,
+        catTypeface: Typeface? = null, catSizeOffset: Int = 0
     ): View {
         val strokeW  = sizePx * 0.13f
         val clamped  = progress.coerceIn(0f, 1f)
@@ -779,8 +868,8 @@ class LockscreenActivity : Activity() {
         }
         val txtPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textAlign = Paint.Align.CENTER; color = textColor
-            textSize = sizePx * 0.20f
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            textSize = sizePx * 0.20f + (catSizeOffset * 1.5f)
+            if (catTypeface != null) typeface = catTypeface else typeface = Typeface.create("sans-serif", Typeface.BOLD)
         }
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
@@ -799,7 +888,8 @@ class LockscreenActivity : Activity() {
         container.addView(TextView(ctx).apply {
             text = label
             setTextColor(Color.argb(160, Color.red(textColor), Color.green(textColor), Color.blue(textColor)))
-            textSize = 9f; gravity = Gravity.CENTER
+            textSize = 9f + catSizeOffset; gravity = Gravity.CENTER
+            if (catTypeface != null) typeface = catTypeface
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(3) }
@@ -807,7 +897,7 @@ class LockscreenActivity : Activity() {
         return container
     }
 
-    private fun buildUnlockSlider(ctx: Context, accentColor: Int, text3Color: Int, variant: String): View {
+    private fun buildUnlockSlider(ctx: Context, accentColor: Int, text3Color: Int, variant: String, catTypeface: Typeface? = null, catSizeOffset: Int = 0): View {
         val MP = ViewGroup.LayoutParams.MATCH_PARENT
         val WC = ViewGroup.LayoutParams.WRAP_CONTENT
         return LinearLayout(ctx).apply {
@@ -835,7 +925,8 @@ class LockscreenActivity : Activity() {
                 addView(fill)
                 addView(TextView(ctx).apply {
                     text = if (isCharging) "⚡ $batteryLevel%" else "$batteryLevel%"
-                    setTextColor(Color.WHITE); gravity = Gravity.CENTER; textSize = 12f; setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(Color.WHITE); gravity = Gravity.CENTER; textSize = 12f + catSizeOffset
+                    if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
                     layoutParams = FrameLayout.LayoutParams(
                         FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
                     bottomChargingIconView = this
@@ -848,22 +939,26 @@ class LockscreenActivity : Activity() {
         }
     }
 
-    private fun buildPill(ctx: Context, textStr: String, textColor: Int, variant: String): View =
+    private fun buildPill(ctx: Context, textStr: String, textColor: Int, variant: String, bg1Color: Int, catTypeface: Typeface? = null, catSizeOffset: Int = 0): View =
         TextView(ctx).apply {
-            text = textStr; setTextColor(textColor); textSize = 10f
-            setTypeface(typeface, Typeface.BOLD)
+            text = textStr; setTextColor(textColor); textSize = 10f + catSizeOffset
+            if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
             setPadding(dp(12), dp(6), dp(12), dp(6))
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             val isLight = variant == "warmLight" || variant == "softSage"
-            background = GradientDrawable().apply {
-                setColor(if (isLight) Color.argb(30, 0, 0, 0) else Color.argb(100, 0, 0, 0))
-                cornerRadius = dp(16).toFloat()
-                setStroke(dp(1), if (isLight) Color.argb(40, 0, 0, 0) else Color.argb(60, 255, 255, 255))
+            if (isLight) {
+                background = cardBackground(bg1Color, null, true)
+            } else {
+                background = GradientDrawable().apply {
+                    setColor(Color.argb(100, 0, 0, 0))
+                    cornerRadius = dp(16).toFloat()
+                    setStroke(dp(1), Color.argb(60, 255, 255, 255))
+                }
             }
         }
 
-    private fun buildBatteryWidget(ctx: Context, accentColor: Int): View {
+    private fun buildBatteryWidget(ctx: Context, accentColor: Int, catTypeface: Typeface? = null, catSizeOffset: Int = 0): View {
         val WC = ViewGroup.LayoutParams.WRAP_CONTENT
         return LinearLayout(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(WC, WC)
@@ -871,7 +966,8 @@ class LockscreenActivity : Activity() {
             
             addView(TextView(ctx).apply {
                 text = "$batteryLevel%"
-                setTextColor(Color.WHITE); textSize = 11f; setTypeface(typeface, Typeface.BOLD)
+                setTextColor(Color.WHITE); textSize = 11f + catSizeOffset
+                if (catTypeface != null) typeface = catTypeface else setTypeface(typeface, Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(WC, WC)
             }.also { batteryTexts.add(it) })
             
@@ -883,39 +979,6 @@ class LockscreenActivity : Activity() {
         }
     }
 
-    private fun addBackgroundShapes(ctx: Context, root: FrameLayout, variant: String, density: Float) {
-        fun dp(v: Int) = (v * density).toInt()
-        val sw = resources.displayMetrics.widthPixels
-        val sh = resources.displayMetrics.heightPixels
-        when (variant) {
-            "deepForest", "softSage" -> {
-                root.addView(View(ctx).apply {
-                    layoutParams = FrameLayout.LayoutParams(dp(80), dp(350)).apply {
-                        gravity = Gravity.BOTTOM or Gravity.START; leftMargin = dp(-20); bottomMargin = dp(-50)
-                    }
-                    background = GradientDrawable().apply { setColor(Color.argb(35,0,0,0)); cornerRadius = dp(40).toFloat() }
-                })
-                root.addView(View(ctx).apply {
-                    layoutParams = FrameLayout.LayoutParams(dp(70), dp(400)).apply {
-                        gravity = Gravity.BOTTOM or Gravity.START; leftMargin = dp(80); bottomMargin = dp(-20)
-                    }
-                    background = GradientDrawable().apply { setColor(Color.argb(45,0,0,0)); cornerRadius = dp(35).toFloat() }
-                })
-            }
-            "midnightStars", "oceanDive" -> root.addView(View(ctx).apply {
-                val size = (sw * 0.6).toInt()
-                layoutParams = FrameLayout.LayoutParams(size, size).apply { gravity = Gravity.CENTER }
-                background = GradientDrawable().apply { setColor(Color.argb(35,0,0,0)); cornerRadius = (size/2).toFloat() }
-            })
-            "warmEarth" -> root.addView(View(ctx).apply {
-                val size = (sw * 1.2).toInt()
-                layoutParams = FrameLayout.LayoutParams(size, size).apply {
-                    gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; topMargin = (sh * 0.35).toInt()
-                }
-                background = GradientDrawable().apply { setColor(Color.argb(35,0,0,0)); cornerRadius = (size/2).toFloat() }
-            })
-        }
-    }
 
     private fun loadBitmapFromUri(uri: String): Bitmap? {
         return try {

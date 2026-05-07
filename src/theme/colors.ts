@@ -124,7 +124,83 @@ export const warmEarth = {
   tagline: 'SEIZE THE DAY',
 } as const;
 
-export type ThemeVariant = 'darkPremium' | 'warmLight' | 'glassmorphism' | 'deepForest' | 'softSage' | 'midnightStars' | 'oceanDive' | 'warmEarth';
+export const onyxGold = {
+  bg: '#080808',
+  bg1: '#121212',
+  bg2: '#1C1C1C',
+  bg3: '#262626',
+  accent: '#FFD700',
+  accentDim: 'rgba(255,215,0,0.15)',
+  text: '#FFFFFF',
+  text2: '#E5E5E5',
+  text3: '#A3A3A3',
+  border: 'rgba(255,215,0,0.12)',
+  card: 'rgba(255,255,255,0.05)',
+  statusBg: 'transparent',
+  tagline: 'ONYX & GOLD',
+} as const;
+
+export const royalAmethyst = {
+  bg: '#1A0F1E',
+  bg1: '#241529',
+  bg2: '#2D1B33',
+  bg3: '#3D2645',
+  accent: '#B19CD9',
+  accentDim: 'rgba(177,156,217,0.15)',
+  text: '#F5F3FF',
+  text2: '#DDD6FE',
+  text3: '#A78BFA',
+  border: 'rgba(177,156,217,0.12)',
+  card: 'rgba(255,255,255,0.05)',
+  statusBg: 'transparent',
+  tagline: 'ROYAL MYSTERY',
+} as const;
+
+export const cobaltNight = {
+  bg: '#0A1128',
+  bg1: '#001F3F',
+  bg2: '#003366',
+  bg3: '#004080',
+  accent: '#00BFFF',
+  accentDim: 'rgba(0,191,255,0.15)',
+  text: '#F0F9FF',
+  text2: '#BAE6FD',
+  text3: '#38BDF8',
+  border: 'rgba(0,191,255,0.12)',
+  card: 'rgba(255,255,255,0.05)',
+  statusBg: 'transparent',
+  tagline: 'COBALT VIBES',
+} as const;
+
+export const roseQuartz = {
+  bg: '#FFF5F5',
+  bg1: '#FFFFFF',
+  bg2: '#FEE2E2',
+  bg3: '#FECACA',
+  accent: '#B76E79',
+  accentDim: 'rgba(183,110,121,0.08)',
+  text: '#451A03',
+  text2: '#78350F',
+  text3: '#92400E',
+  border: 'rgba(183,110,121,0.12)',
+  card: 'rgba(183,110,121,0.04)',
+  statusBg: '#FFF5F5',
+  tagline: 'ROSE LUXURY',
+} as const;
+
+export type ThemeVariant = 
+  | 'onyxGold' 
+  | 'darkPremium' 
+  | 'royalAmethyst' 
+  | 'midnightStars' 
+  | 'roseQuartz' 
+  | 'warmLight' 
+  | 'cobaltNight' 
+  | 'oceanDive' 
+  | 'glassmorphism' 
+  | 'warmEarth' 
+  | 'deepForest' 
+  | 'softSage';
 
 export interface ThemeColors {
   bg: string;
@@ -143,23 +219,31 @@ export interface ThemeColors {
 }
 
 export const themes: Record<ThemeVariant, ThemeColors> = {
+  onyxGold,
   darkPremium,
+  royalAmethyst,
+  midnightStars,
+  roseQuartz,
   warmLight,
+  cobaltNight,
+  oceanDive,
   glassmorphism,
+  warmEarth,
   deepForest,
   softSage,
-  midnightStars,
-  oceanDive,
-  warmEarth,
 };
 
 export const themeWallpapers: Record<ThemeVariant, any> = {
+  onyxGold: require('../../assets/wallpapers/onyx_gold.png'),
   darkPremium: require('../../assets/wallpapers/dark_premium.png'),
+  royalAmethyst: require('../../assets/wallpapers/royal_amethyst.png'),
+  midnightStars: require('../../assets/wallpapers/midnight_stars.png'),
+  roseQuartz: require('../../assets/wallpapers/rose_quartz.png'),
   warmLight: require('../../assets/wallpapers/warm_light.png'),
+  cobaltNight: require('../../assets/wallpapers/cobalt_night.png'),
+  oceanDive: require('../../assets/wallpapers/ocean_dive.png'),
   glassmorphism: require('../../assets/wallpapers/glassmorphism.png'),
+  warmEarth: require('../../assets/wallpapers/warm_earth.png'),
   deepForest: require('../../assets/wallpapers/deep_forest.png'),
   softSage: require('../../assets/wallpapers/soft_sage.png'),
-  midnightStars: require('../../assets/wallpapers/midnight_stars.png'),
-  oceanDive: require('../../assets/wallpapers/ocean_dive.png'),
-  warmEarth: require('../../assets/wallpapers/warm_earth.png'),
 };

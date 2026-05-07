@@ -78,6 +78,11 @@ export default function App() {
     SpaceGrotesk_700Bold,
     SpaceMono_400Regular,
     SpaceMono_700Bold,
+    BebasNeue_400Regular: require('./assets/fonts/BebasNeue_400Regular.ttf'),
+    Orbitron_700Bold: require('./assets/fonts/Orbitron_700Bold.ttf'),
+    PlayfairDisplay_700Bold: require('./assets/fonts/PlayfairDisplay_700Bold.ttf'),
+    Raleway_300Light: require('./assets/fonts/Raleway_300Light.ttf'),
+    JosefinSans_600SemiBold: require('./assets/fonts/JosefinSans_600SemiBold.ttf'),
   });
 
   return (

@@ -1,7 +1,7 @@
 @echo off
 set "CONFIG_FILE=connect_config.txt"
 set "ADB_EXE=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe"
-
+taskkill /IM adb* /F
 :: Default values
 set "LAST_IP=192.168.0.204"
 set "LAST_PORT=39135"

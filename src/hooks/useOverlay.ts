@@ -27,7 +27,7 @@ export function useOverlay() {
     return () => sub.remove();
   }, [checkStatus]);
 
-  const syncData = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], weather?: string, widgets?: string[], wallpaper?: string, wallpaperFilter?: string) => {
+  const syncData = useCallback(async (variant: string, colors: ThemeColors, dates: AnchorDate[], weather?: string, widgets?: string[], wallpaper?: string, wallpaperFilter?: string, fontId?: string, fontSettings?: any) => {
     if (!LockscreenModule?.syncOverlayData) return;
     console.log('[useOverlay] syncData called with variant:', variant, 'wallpaper:', wallpaper, 'filter:', wallpaperFilter);
     setSyncing(true);
@@ -47,6 +47,8 @@ export function useOverlay() {
         widgets: widgets || ['clock', 'battery', 'milestone', 'anniversary', 'birthday', 'weather'],
         wallpaper: wpName,
         wallpaperFilter: wallpaperFilter || 'original',
+        fontId: fontId || 'stencil',
+        fontSettings: fontSettings || null,
       });
       const sortedBirthdays = [...dates]
         .filter(d => d.type === 'birthday')

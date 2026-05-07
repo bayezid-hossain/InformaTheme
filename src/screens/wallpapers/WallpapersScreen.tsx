@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { TopBar } from '../../components/TopBar';
 import { useTheme, themeWallpapers } from '../../hooks/useTheme';
 import { useOverlay } from '../../hooks/useOverlay';
@@ -11,7 +12,7 @@ import { useDates } from '../../context/DateStoreContext';
 import { ThemeVariant } from '../../theme/colors';
 import { getFilterOverlay } from '../../constants/wallpaperFilters';
 import { LockscreenPreview } from '../../components/LockscreenPreview';
-import { Check, RotateCcw, ImagePlus, Trash2, Pencil, Eye, X } from 'lucide-react-native';
+import { Check, RotateCcw, ImagePlus, Trash2, Pencil, X, Crop } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 const CARD_W = (width - 42) / 2;
@@ -22,14 +23,18 @@ interface WallpaperItem {
 }
 
 const WALLPAPERS: WallpaperItem[] = [
+  { id: 'onyxGold',     name: 'Onyx & Gold' },
   { id: 'darkPremium',    name: 'Dark Premium' },
+  { id: 'royalAmethyst',  name: 'Royal Amethyst' },
+  { id: 'midnightStars',  name: 'Midnight Stars' },
+  { id: 'roseQuartz',     name: 'Rose Quartz' },
   { id: 'warmLight',      name: 'Warm Light' },
+  { id: 'cobaltNight',    name: 'Cobalt Night' },
+  { id: 'oceanDive',      name: 'Ocean Dive' },
   { id: 'glassmorphism',  name: 'Glassmorphism' },
+  { id: 'warmEarth',      name: 'Warm Earth' },
   { id: 'deepForest',     name: 'Deep Forest' },
   { id: 'softSage',       name: 'Soft Sage' },
-  { id: 'midnightStars',  name: 'Midnight Stars' },
-  { id: 'oceanDive',      name: 'Ocean Dive' },
-  { id: 'warmEarth',      name: 'Warm Earth' },
 ];
 
 export function WallpapersScreen() {
@@ -57,8 +62,6 @@ export function WallpapersScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,
-      allowsEditing: true,
-      aspect: [9, 19.5],
     });
 
     if (!result.canceled && result.assets[0]) {
@@ -68,6 +71,27 @@ export function WallpapersScreen() {
         imageWidth: imgW ?? 1080,
         imageHeight: imgH ?? 1920,
       });
+    }
+  };
+
+  const handleEditPreset = async (wpId: ThemeVariant) => {
+    try {
+      const source = themeWallpapers[wpId];
+      const { Image: RNImage } = require('react-native');
+      const resolved = RNImage.resolveAssetSource(source);
+      if (!resolved?.uri) return;
+      const localPath = `${FileSystem.cacheDirectory}wp_preset_${wpId}.jpg`;
+      const info = await FileSystem.getInfoAsync(localPath);
+      if (!info.exists) {
+        await FileSystem.downloadAsync(resolved.uri, localPath);
+      }
+      navigation.navigate('WallpaperEditor', {
+        imageUri: localPath,
+        imageWidth: resolved.width ?? 1080,
+        imageHeight: resolved.height ?? 1920,
+      });
+    } catch (e) {
+      console.error('[handleEditPreset]', e);
     }
   };
 
@@ -200,7 +224,7 @@ export function WallpapersScreen() {
                 }}
               >
                 <View style={{ height: CARD_W * 1.5, backgroundColor: colors.bg3 }}>
-                  <Image source={themeWallpapers[w.id]} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  <Image source={themeWallpapers[w.id]} style={{ width: '100%', height: '100%' }} resizeMode="stretch" />
                   {isActive && (
                     <View className="absolute top-2 right-2 w-6 h-6 rounded-full justify-center items-center" style={{ backgroundColor: colors.accent }}>
                       <Check size={14} color="#000" strokeWidth={3.5} />
@@ -223,22 +247,12 @@ export function WallpapersScreen() {
                   </Text>
                   <View className="flex-row gap-1.5">
                     <TouchableOpacity
-                      onPress={() => handleSelectWallpaper(w.id)}
+                      onPress={() => handleEditPreset(w.id)}
                       className="flex-1 py-1.5 rounded-lg items-center justify-center flex-row gap-1"
-                      style={{ backgroundColor: isActive ? colors.accentDim : colors.accent }}
+                      style={{ backgroundColor: colors.accent }}
                     >
-                      <Check size={11} color={isActive ? colors.accent : colors.bg} strokeWidth={3} />
-                      <Text className="text-[11px] font-extrabold" style={{ color: isActive ? colors.accent : colors.bg }}>
-                        {isActive ? 'Active' : 'Set'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setPreviewWallpaperId(w.id)}
-                      className="flex-1 py-1.5 rounded-lg items-center justify-center flex-row gap-1"
-                      style={{ backgroundColor: colors.bg3 }}
-                    >
-                      <Eye size={11} color={colors.text2} />
-                      <Text className="text-[11px] font-bold" style={{ color: colors.text2 }}>Preview</Text>
+                      <Crop size={11} color={colors.bg} strokeWidth={2.5} />
+                      <Text className="text-[11px] font-extrabold" style={{ color: colors.bg }}>Set</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
