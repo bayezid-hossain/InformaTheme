@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-05-08 (session 7) — To-Do Cards, Dates Screen Polish, Custom Local Wallpapers Fix, and Automated Release Installer
+
+**Plan:**
+1. Match the native lockscreen To-Do card design exactly with the premium React Native theme preview.
+2. Polish Dates Screen and History Screen to be crash-proof, removing Days Since/Elapsed counters in favor of exact remaining countdowns.
+3. Fix local preset wallpaper cropping on real devices under release build.
+4. Generate gorgeous nature wallpapers matching Royal Amethyst, Rose Quartz, and Glassmorphism color palettes.
+5. Create an automated script `run_release.bat` to streamline release APK installation via ADB.
+
+**Steps completed:**
+1. **Native To-Do Card Redesign:** Rewrote `LockscreenActivity.kt` (`buildTodoCard`) to use a horizontal row layout with a `dp(54)` circular glass bubble holding the exact countdown, a vertical label/due-date text stack, and a centered completion button at the bottom.
+2. **Crash-proof History Screen:** Added a robust `safeFormatDate` parsing helper in `HistoryScreen.tsx`, updated items to use click-to-restore with modal confirmations, and stripped redundant right icons.
+3. **Dates Screen & Modal Polish:** Set default modal categories to `'todo'`, implemented a backdate warning, removed Days Since/Elapsed counters, and added Target Time and live-calculated Remaining Time.
+4. **Exact Countdown Math:** Integrated exact calendar-math countdowns across Home screen lists, Dates screen lists, Lockscreen Preview, and Lockscreen Kotlin overlay.
+5. **Wallpaper Set & Crop Resolution:** Rewrote `handleEditPreset` inside [WallpapersScreen.tsx](file:///c:/Users/amiba/Projects/InformaTheme/src/screens/wallpapers/WallpapersScreen.tsx) to copy local packaged assets via `FileSystem.copyAsync` instead of `FileSystem.downloadAsync` (which is restricted to HTTP/HTTPS schemes). This fully resolved the unresponsiveness of preset wallpaper editing on real devices.
+6. **Premium Nature Wallpapers:** Generated 3 stunning, high-vibrancy abstract nature wallpapers for Royal Amethyst (misty purple forest under stars), Rose Quartz (soft pink garden at sunrise), and Glassmorphism (lush emerald rainforest dewdrop) themes, fully matching their color profiles.
+7. **Automated Release Installer:** Created [run_release.bat](file:///c:/Users/amiba/Projects/InformaTheme/run_release.bat) in the root directory. It automatically resolves the Windows Android SDK's `adb.exe` path, checks connected devices, and streams the compiled release APK to any connected device via wireless or wired ADB.
+
+**Deviations:** None.
+
+---
+
 ## 2026-05-07 (session 6) — Fix preset wallpaper editor + overlay startup lag
 
 **Plan:**

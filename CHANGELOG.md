@@ -5,6 +5,16 @@ All notable changes to InformaTheme will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Redesigned native lockscreen To-Do cards (`buildTodoCard` in `LockscreenActivity.kt`) with a horizontal row layout containing a countdown bubble, vertical text stack for label/due-date, and centered complete button.
+- Exact countdown mathematical calculations implemented on Home screen lists, Dates screen lists, Lockscreen Preview, and Lockscreen Kotlin overlay.
+- Added a safe date parsing utility `safeFormatDate` to `HistoryScreen.tsx` to prevent crashes, restructured items to use Click-to-Restore with confirmation prompts, and stripped redundant icons.
+- Set default modal selected category to `'todo'` and implemented backdate warning.
+- Replaced Days Since/Elapsed counters on the Dates screen with Target Time and live-calculated Remaining Time.
+- Rewrote `handleEditPreset` in `WallpapersScreen.tsx` using `FileSystem.copyAsync` to copy local assets safely instead of `downloadAsync` (which fails on local resource schemes). Resolves preset cropping/filtering under both debug and release builds.
+- Created `run_release.bat` script to automate building and wirelessly/wired installing the compiled Release APK to any connected ADB device with absolute-path resolution of `adb.exe`.
+- Generated and integrated 3 stunning, high-vibrancy abstract nature wallpapers matching the color profiles of Royal Amethyst, Rose Quartz, and Glassmorphism themes.
+
+### Added
 - Removed Drawer navigation and replaced with Stack navigation. Removed mock Status Bar elements. Overhauled InformaAlert to Industrial Urgency design. Fixed Android permissions (LockscreenPackage registration and FSI Notification Channel). Implemented WindowManager LockscreenService overlay triggered on SCREEN_OFF. Enforced permission checks at startup.
 
 ### Added

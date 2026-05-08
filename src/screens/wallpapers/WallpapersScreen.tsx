@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system/legacy';
 import { TopBar } from '../../components/TopBar';
 import { useTheme, themeWallpapers } from '../../hooks/useTheme';
 import { useOverlay } from '../../hooks/useOverlay';
@@ -75,15 +76,36 @@ export function WallpapersScreen() {
   };
 
   const handleEditPreset = async (wpId: ThemeVariant) => {
-    const source = themeWallpapers[wpId];
-    const asset = Asset.fromModule(source);
-    await asset.downloadAsync();
-    if (!asset.localUri) return;
-    navigation.navigate('WallpaperEditor', {
-      imageUri: asset.localUri,
-      imageWidth: asset.width ?? 1080,
-      imageHeight: asset.height ?? 1920,
-    });
+    try {
+      const source = themeWallpapers[wpId];
+      const asset = Asset.fromModule(source);
+      await asset.downloadAsync();
+      
+      const filename = `preset_${wpId}.jpg`;
+      const localCacheUri = `${FileSystem.cacheDirectory || FileSystem.documentDirectory || ''}${filename}`;
+      
+      // Clear old cache if it exists
+      const info = await FileSystem.getInfoAsync(localCacheUri);
+      if (info.exists) {
+        await FileSystem.deleteAsync(localCacheUri, { idempotent: true });
+      }
+
+      if (asset.localUri) {
+        await FileSystem.copyAsync({ from: asset.localUri, to: localCacheUri });
+      } else if (asset.uri && asset.uri.startsWith('http')) {
+        await FileSystem.downloadAsync(asset.uri, localCacheUri);
+      } else if (asset.uri) {
+        await FileSystem.copyAsync({ from: asset.uri, to: localCacheUri });
+      }
+      
+      navigation.navigate('WallpaperEditor', {
+        imageUri: localCacheUri,
+        imageWidth: asset.width ?? 1080,
+        imageHeight: asset.height ?? 1920,
+      });
+    } catch (e) {
+      console.error('[WallpapersScreen] handleEditPreset failed:', e);
+    }
   };
 
   const handleRemoveCustom = async () => {

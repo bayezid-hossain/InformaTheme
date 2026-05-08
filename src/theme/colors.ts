@@ -233,6 +233,7 @@ export const themes: Record<ThemeVariant, ThemeColors> = {
   softSage,
 };
 
+// Nature premium wallpapers 2026
 export const themeWallpapers: Record<ThemeVariant, any> = {
   onyxGold: require('../../assets/wallpapers/onyx_gold.jpg'),
   darkPremium: require('../../assets/wallpapers/dark_premium.jpg'),
